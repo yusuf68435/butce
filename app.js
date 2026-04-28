@@ -351,6 +351,25 @@ function categoryMeta(name) {
 }
 
 /* ==========================================================================
+   HAPTICS (Vibration API — best-effort, silent if unsupported)
+   ========================================================================== */
+
+const Haptics = {
+  light() {
+    if (navigator.vibrate) navigator.vibrate(8);
+  },
+  medium() {
+    if (navigator.vibrate) navigator.vibrate(14);
+  },
+  success() {
+    if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
+  },
+  warning() {
+    if (navigator.vibrate) navigator.vibrate([20, 60, 20]);
+  },
+};
+
+/* ==========================================================================
    PRIVACY MODE (hide balance with dots)
    ========================================================================== */
 
@@ -2511,6 +2530,140 @@ const Settings = (() => {
     };
     reader.readAsText(file);
   }
+  function parseCSV(text) {
+    const rows = [];
+    let i = 0,
+      cur = "",
+      row = [],
+      inQuotes = false;
+    while (i < text.length) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"' && text[i + 1] === '"') {
+          cur += '"';
+          i += 2;
+          continue;
+        }
+        if (ch === '"') {
+          inQuotes = false;
+          i++;
+          continue;
+        }
+        cur += ch;
+        i++;
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+          i++;
+          continue;
+        }
+        if (ch === ",") {
+          row.push(cur);
+          cur = "";
+          i++;
+          continue;
+        }
+        if (ch === "\r") {
+          i++;
+          continue;
+        }
+        if (ch === "\n") {
+          row.push(cur);
+          rows.push(row);
+          cur = "";
+          row = [];
+          i++;
+          continue;
+        }
+        cur += ch;
+        i++;
+      }
+    }
+    if (cur || row.length) {
+      row.push(cur);
+      rows.push(row);
+    }
+    return rows.filter((r) => r.some((c) => String(c).trim().length));
+  }
+
+  async function importCSV(file) {
+    if (!file) return;
+    const text = await file.text();
+    const rows = parseCSV(text);
+    if (!rows.length) {
+      Toast.show("Boş CSV", "error");
+      return;
+    }
+    const first = rows[0].map((c) => c.toLowerCase().trim());
+    const hasHeader =
+      first.includes("date") ||
+      first.includes("tarih") ||
+      first.includes("type");
+    const data = hasHeader ? rows.slice(1) : rows;
+
+    let added = 0;
+    let skipped = 0;
+    const newTx = [];
+    for (const r of data) {
+      const [dateRaw, typeRaw, category, amountRaw, description = ""] = r;
+      const dateStr = String(dateRaw || "").trim();
+      let iso = dateStr;
+      const trMatch = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(dateStr);
+      if (trMatch) iso = `${trMatch[3]}-${trMatch[2]}-${trMatch[1]}`;
+      const type = String(typeRaw || "")
+        .trim()
+        .toLowerCase();
+      const amount = parseAmount(amountRaw);
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(iso) ||
+        !["income", "expense", "gelir", "gider"].includes(type) ||
+        !amount ||
+        amount <= 0 ||
+        !category
+      ) {
+        skipped++;
+        continue;
+      }
+      newTx.push({
+        id: uid(),
+        type: type === "income" || type === "gelir" ? "income" : "expense",
+        category: String(category).trim(),
+        amount,
+        description: String(description || "").trim(),
+        date: iso,
+      });
+      added++;
+    }
+
+    if (!added) {
+      Toast.show(`Hiçbir satır eklenmedi (${skipped} atlandı)`, "error");
+      return;
+    }
+    const ok = await Confirm.show({
+      title: `${added} hareket eklensin mi?`,
+      message: skipped
+        ? `${skipped} satır atlandı (geçersiz format).`
+        : "Mevcut verilere eklenir, üzerine yazmaz.",
+      confirmLabel: "Ekle",
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      const seen = new Set(s.categories.income.concat(s.categories.expense));
+      for (const t of newTx) {
+        if (!seen.has(t.category)) {
+          (t.type === "income"
+            ? s.categories.income
+            : s.categories.expense
+          ).push(t.category);
+          seen.add(t.category);
+        }
+      }
+      s.transactions.push(...newTx);
+    });
+    Toast.show(`${added} hareket eklendi`, "success");
+    Sheets.close("sheet-settings");
+  }
+
   async function reset() {
     const ok1 = await Confirm.show({
       title: "Tüm veriyi silmek istiyor musun?",
@@ -2537,6 +2690,20 @@ const Settings = (() => {
     $("#import-file").addEventListener("change", (e) =>
       importData(e.target.files[0]),
     );
+    const csvBtn = $("#import-csv-btn");
+    if (csvBtn) {
+      csvBtn.addEventListener("click", () => $("#import-csv-file").click());
+      $("#import-csv-file").addEventListener("change", async (e) => {
+        try {
+          await importCSV(e.target.files[0]);
+        } catch (err) {
+          Toast.show("CSV okunamadı", "error");
+          console.error(err);
+        } finally {
+          $("#import-csv-file").value = "";
+        }
+      });
+    }
     $("#reset-btn").addEventListener("click", reset);
     $$("[data-theme-opt]").forEach((b) => {
       b.addEventListener("click", () => Theme.apply(b.dataset.themeOpt));
@@ -2644,6 +2811,72 @@ function bindOnlineStatus() {
    INIT
    ========================================================================== */
 
+function bindPullToRefresh() {
+  const ptr = $("#ptr");
+  if (!ptr) return;
+  let startY = 0;
+  let pulling = false;
+  let pid = null;
+
+  const isAtTop = () => (window.scrollY || 0) <= 0;
+
+  function onDown(e) {
+    if (!isAtTop() || pulling) return;
+    pid = e.pointerId;
+    startY = e.clientY;
+    pulling = true;
+  }
+  function onMove(e) {
+    if (!pulling || e.pointerId !== pid) return;
+    const dy = e.clientY - startY;
+    if (dy <= 0) return;
+    const h = Math.min(80, dy * 0.5);
+    ptr.style.height = h + "px";
+    ptr.classList.toggle("active", h > 30);
+    if (h > 56) Haptics.light();
+  }
+  async function onUp(e) {
+    if (!pulling || e.pointerId !== pid) return;
+    pulling = false;
+    const triggered = ptr.classList.contains("active");
+    ptr.style.height = "";
+    if (triggered && activeTab === "silver") {
+      ptr.classList.add("refreshing");
+      Haptics.medium();
+      await fetchSilverPrice();
+      ptr.classList.remove("refreshing");
+    } else if (triggered) {
+      // Generic refresh — re-render active page
+      ptr.classList.add("refreshing");
+      Haptics.medium();
+      setTimeout(() => {
+        renderAll();
+        ptr.classList.remove("refreshing");
+      }, 360);
+    }
+    ptr.classList.remove("active");
+  }
+
+  document.addEventListener("pointerdown", onDown, { passive: true });
+  document.addEventListener("pointermove", onMove, { passive: true });
+  document.addEventListener("pointerup", onUp, { passive: true });
+  document.addEventListener("pointercancel", onUp, { passive: true });
+}
+
+function bindHaptics() {
+  // Light tick on chip/seg/tab/cta-chip taps
+  document.addEventListener(
+    "click",
+    (e) => {
+      const t = e.target.closest(
+        ".chip, .seg-opt, .tab, .cta-chip, .month-cell, .pull-btn, [data-tx-type], [data-silver-kind]",
+      );
+      if (t) Haptics.light();
+    },
+    true,
+  );
+}
+
 function bindPrivacyToggle() {
   const btn = $("#privacy-toggle");
   if (btn) btn.addEventListener("click", () => Privacy.toggle());
@@ -2729,6 +2962,8 @@ function init() {
   bindTopbarScrollBlur();
   bindHeroTilt();
   bindPrivacyToggle();
+  bindPullToRefresh();
+  bindHaptics();
 
   // Header add button — opens sheet for active tab
   $("#header-add").addEventListener("click", () => {

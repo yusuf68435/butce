@@ -1919,6 +1919,9 @@ html[data-theme="dark"] .chip.active {
 .settings-row .ic.danger {
   background: linear-gradient(135deg, #ff6171, #e5364e);
 }
+.settings-row .ic.csv {
+  background: linear-gradient(135deg, #b07bff, #7e4dff);
+}
 .settings-row .ic.theme {
   background: linear-gradient(135deg, #6e8fa6, #2c3040);
 }
@@ -2061,6 +2064,43 @@ html[data-theme="dark"] .month-cell.active {
 }
 .month-cell.active.has::after {
   background: #04140a;
+}
+
+/* ============ PULL-TO-REFRESH ============ */
+.ptr {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--safe-top);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: height 0.24s var(--ease-spring);
+  z-index: 5;
+}
+.ptr.active {
+  height: 56px;
+}
+.ptr-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid var(--hairline);
+  border-top-color: var(--neon-1);
+  margin-bottom: 12px;
+  transform: rotate(0);
+  transition: transform 0.16s linear;
+}
+.ptr.refreshing .ptr-spinner {
+  animation: ptr-spin 0.9s linear infinite;
+}
+@keyframes ptr-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ============ COUNT-UP FLASH ============ */

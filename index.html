@@ -35,7 +35,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=20" />
+    <link rel="stylesheet" href="style.css?v=21" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -57,6 +57,9 @@
           ></button>
         </header>
 
+        <div class="ptr" id="ptr" aria-hidden="true">
+          <div class="ptr-spinner"></div>
+        </div>
         <div class="scroll" id="scroll-root">
           <!-- ============================================================
                CASH PAGE
@@ -644,6 +647,14 @@
               </div>
               <span class="chev" data-icon="chevron-right"></span>
             </button>
+            <button type="button" class="settings-row" id="import-csv-btn">
+              <div class="ic csv" data-icon="doc"></div>
+              <div>
+                <div class="label">CSV İçe Aktar</div>
+                <div class="sub">date,type,category,amount,description</div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
           </div>
         </section>
 
@@ -670,6 +681,7 @@
       accept="application/json,.json"
       hidden
     />
+    <input type="file" id="import-csv-file" accept="text/csv,.csv" hidden />
 
     <!-- Date picker sheet (custom wheel) -->
     <div
@@ -752,6 +764,6 @@
       </form>
     </div>
 
-    <script src="app.js?v=20" defer></script>
+    <script src="app.js?v=21" defer></script>
   </body>
 </html>
