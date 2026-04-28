@@ -98,6 +98,20 @@ const CHART_PALETTE = [
 const PRICE_ENDPOINT = "https://finans.truncgil.com/today.json";
 
 /* ==========================================================================
+   CURRENCY (display-only switch — internal storage stays TRY)
+   ========================================================================== */
+
+const CURRENCY_META = {
+  TRY: { sym: "₺", code: "TRY", locale: "tr-TR", name: "Türk Lirası" },
+  USD: { sym: "$", code: "USD", locale: "en-US", name: "US Dollar" },
+  EUR: { sym: "€", code: "EUR", locale: "de-DE", name: "Euro" },
+};
+
+const FX_ENDPOINT = "https://api.frankfurter.app/latest?from=TRY&to=USD,EUR";
+// rates[X] = how many X you get for 1 TRY (e.g. USD ~ 0.029 means 1 TRY ≈ 0.029 USD)
+const FX_DEFAULT = { TRY: 1, USD: 0.029, EUR: 0.027, ts: 0 };
+
+/* ==========================================================================
    i18n — TR/EN (compact dictionary, key-driven)
    ========================================================================== */
 
@@ -189,6 +203,15 @@ const I18N = {
     "settings.notifDenied": "İzin reddedildi — tarayıcı ayarından açabilirsin",
     "settings.recurring": "Tekrarlayan İşlemler",
     "settings.recurringSub": "Her ay otomatik kira/maaş/fatura",
+    "settings.currency": "Para Birimi",
+    "settings.currencySub": "Görüntüleme dövizi (veriler ₺ olarak saklanır)",
+    "settings.fxRates": "Kur Bilgisi",
+    "settings.fxFetch": "Güncel Kuru Çek",
+    "settings.fxFetchSub": "Frankfurter.app — internet gerekir",
+    "settings.fxNever": "Henüz çekilmedi",
+    "settings.fxLast": "Son güncelleme",
+    "toast.fxUpdated": "Kur güncellendi",
+    "toast.fxFailed": "Kur alınamadı — eski veriler kullanılıyor",
     "notif.budgetTitle": "Bütçe Limiti Aşıldı",
     "notif.budgetOver": "limiti aştı",
     "title.newRecurring": "Yeni Tekrarlayan",
@@ -318,6 +341,15 @@ const I18N = {
     "settings.notifDenied": "Permission denied — enable from browser settings",
     "settings.recurring": "Recurring Transactions",
     "settings.recurringSub": "Auto-add rent/salary/bills every month",
+    "settings.currency": "Currency",
+    "settings.currencySub": "Display currency (data stored in ₺)",
+    "settings.fxRates": "FX Rates",
+    "settings.fxFetch": "Fetch Live Rates",
+    "settings.fxFetchSub": "Frankfurter.app — internet required",
+    "settings.fxNever": "Not fetched yet",
+    "settings.fxLast": "Last updated",
+    "toast.fxUpdated": "Rates updated",
+    "toast.fxFailed": "Could not fetch rates — using cached values",
     "notif.budgetTitle": "Budget Limit Exceeded",
     "notif.budgetOver": "over limit",
     "title.newRecurring": "New Recurring",
@@ -568,26 +600,93 @@ const Store = (() => {
 })();
 
 /* ==========================================================================
-   FORMATTERS
+   FX — multi-currency rate cache (localStorage, offline-first)
+   ========================================================================== */
+
+const FX = (() => {
+  const KEY = "ggai:fx";
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (v && typeof v.TRY === "number") return { ...FX_DEFAULT, ...v };
+      }
+    } catch {}
+    return { ...FX_DEFAULT };
+  }
+  let cache = load();
+  function get() {
+    return cache;
+  }
+  function rate(code) {
+    return cache[code] ?? 1;
+  }
+  function save(rates) {
+    cache = rates;
+    try {
+      localStorage.setItem(KEY, JSON.stringify(rates));
+    } catch {}
+  }
+  async function refresh() {
+    try {
+      const res = await fetch(FX_ENDPOINT, { mode: "cors" });
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (!json?.rates || typeof json.rates.USD !== "number") return null;
+      const next = {
+        TRY: 1,
+        USD: json.rates.USD,
+        EUR: json.rates.EUR,
+        ts: Date.now(),
+      };
+      save(next);
+      return next;
+    } catch {
+      return null;
+    }
+  }
+  return { get, rate, refresh, save };
+})();
+
+function currentCurrency() {
+  return Store.state.settings?.currency || "TRY";
+}
+function currencyMeta(code) {
+  return CURRENCY_META[code || currentCurrency()] || CURRENCY_META.TRY;
+}
+function convertFromTry(amountTry) {
+  const c = currentCurrency();
+  if (c === "TRY") return Number(amountTry) || 0;
+  return (Number(amountTry) || 0) * FX.rate(c);
+}
+
+/* ==========================================================================
+   FORMATTERS — display-currency aware (internal storage stays TRY)
    ========================================================================== */
 
 const fmt = {
   try(n) {
-    const v = Math.round(Number(n) || 0);
+    const cur = currencyMeta();
+    const v = Math.round(convertFromTry(n));
     const sign = v < 0 ? "-" : "";
-    return `${sign}₺${Math.abs(v).toLocaleString("tr-TR")}`;
+    return `${sign}${cur.sym}${Math.abs(v).toLocaleString(cur.locale)}`;
   },
   int(n) {
-    const v = Math.round(Number(n) || 0);
-    return Math.abs(v).toLocaleString("tr-TR");
+    const cur = currencyMeta();
+    const v = Math.round(convertFromTry(n));
+    return Math.abs(v).toLocaleString(cur.locale);
   },
   num(n, opts = {}) {
-    return Number(n || 0).toLocaleString("tr-TR", opts);
+    return Number(n || 0).toLocaleString(currencyMeta().locale, opts);
   },
   signed(n) {
-    const v = Math.round(Number(n) || 0);
+    const cur = currencyMeta();
+    const v = Math.round(convertFromTry(n));
     if (v === 0) return fmt.try(0);
-    return (v > 0 ? "+" : "−") + "₺" + Math.abs(v).toLocaleString("tr-TR");
+    return (
+      (v > 0 ? "+" : "−") + cur.sym + Math.abs(v).toLocaleString(cur.locale)
+    );
   },
   date(iso) {
     if (!iso) return "";
@@ -774,7 +873,7 @@ const Recurring = (() => {
           el(
             "div",
             { class: `row-amount ${r.type === "income" ? "pos" : "neg"}` },
-            `${sign}${fmt.int(r.amount)} ₺`,
+            `${sign}${fmt.int(r.amount)} ${currencyMeta().sym}`,
           ),
         );
         root.appendChild(row);
@@ -1010,6 +1109,72 @@ const Privacy = (() => {
     apply();
   }
   return { init, toggle, get, set, apply };
+})();
+
+/* ==========================================================================
+   CURRENCY (display-only switch — TRY/USD/EUR; FX fetch on demand)
+   ========================================================================== */
+
+const Currency = (() => {
+  const ORDER = ["TRY", "USD", "EUR"];
+  function get() {
+    return Store.state.settings?.currency || "TRY";
+  }
+  function set(code) {
+    if (!CURRENCY_META[code]) return;
+    Store.update((s) => {
+      s.settings = s.settings || {};
+      s.settings.currency = code;
+    });
+    syncThumb();
+  }
+  function syncThumb() {
+    const cur = get();
+    const idx = Math.max(0, ORDER.indexOf(cur));
+    const thumb = $("#currency-thumb");
+    if (thumb) thumb.style.transform = `translateX(${idx * 100}%)`;
+    $$("[data-currency-opt]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.currencyOpt === cur),
+    );
+  }
+  function renderFxMeta() {
+    const meta = $("#fx-meta");
+    if (!meta) return;
+    const fx = FX.get();
+    if (!fx.ts) {
+      meta.textContent = t("settings.fxNever");
+      return;
+    }
+    const d = new Date(fx.ts);
+    const usd = (1 / FX.rate("USD")).toLocaleString("tr-TR", {
+      maximumFractionDigits: 2,
+    });
+    const eur = (1 / FX.rate("EUR")).toLocaleString("tr-TR", {
+      maximumFractionDigits: 2,
+    });
+    meta.textContent = `${t("settings.fxLast")}: ${fmt.date(d.toISOString().slice(0, 10))} · 1$≈${usd}₺ · 1€≈${eur}₺`;
+  }
+  async function fetchRates() {
+    const meta = $("#fx-meta");
+    const before = meta?.textContent;
+    if (meta) meta.textContent = "...";
+    const res = await FX.refresh();
+    if (res) {
+      Toast.show(t("toast.fxUpdated"), "success");
+      Haptics.success();
+      renderFxMeta();
+      // Re-render so amounts pick up fresh rates
+      if (typeof renderAll === "function") renderAll();
+    } else {
+      Toast.show(t("toast.fxFailed"), "error");
+      if (meta && before) meta.textContent = before;
+    }
+  }
+  function init() {
+    syncThumb();
+    renderFxMeta();
+  }
+  return { init, get, set, syncThumb, fetchRates, renderFxMeta };
 })();
 
 /* ==========================================================================
@@ -1738,7 +1903,8 @@ function monthlyTrend(months = 6, mode = "balance") {
 
 const _amountState = new WeakMap();
 function setAmount(node, value) {
-  const target = Math.round(Number(value) || 0);
+  const cur = currencyMeta();
+  const target = Math.round(convertFromTry(Number(value) || 0));
   const isNeg = target < 0;
   node.classList.toggle("is-negative", isNeg);
 
@@ -1749,7 +1915,7 @@ function setAmount(node, value) {
   if (!intSpan || !curSpan) {
     clear(node);
     signSpan = el("span", { class: "sign" }, "−");
-    curSpan = el("span", { class: "currency" }, "₺");
+    curSpan = el("span", { class: "currency" }, cur.sym);
     intSpan = el("span", { class: "int" }, "0");
     node.appendChild(signSpan);
     node.appendChild(curSpan);
@@ -1758,12 +1924,14 @@ function setAmount(node, value) {
     signSpan = el("span", { class: "sign" }, "−");
     node.insertBefore(signSpan, curSpan);
   }
+  // Always sync the symbol — currency may have changed since last render
+  if (curSpan.textContent !== cur.sym) curSpan.textContent = cur.sym;
   signSpan.style.display = isNeg ? "" : "none";
 
   const prev = _amountState.get(node);
   const from = prev ? prev.value : 0;
   if (from === target) {
-    intSpan.textContent = Math.abs(target).toLocaleString("tr-TR");
+    intSpan.textContent = Math.abs(target).toLocaleString(cur.locale);
     _amountState.set(node, { value: target });
     return;
   }
@@ -1772,7 +1940,7 @@ function setAmount(node, value) {
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const range = Math.abs(target - from);
   if (reduced || range > 5_000_000) {
-    intSpan.textContent = Math.abs(target).toLocaleString("tr-TR");
+    intSpan.textContent = Math.abs(target).toLocaleString(cur.locale);
     _amountState.set(node, { value: target });
     return;
   }
@@ -1787,7 +1955,7 @@ function setAmount(node, value) {
   function tick(now) {
     const t = Math.min(1, (now - start) / dur);
     const v = Math.round(from + (target - from) * easeOut(t));
-    intSpan.textContent = Math.abs(v).toLocaleString("tr-TR");
+    intSpan.textContent = Math.abs(v).toLocaleString(cur.locale);
     if (t < 1) {
       const id = requestAnimationFrame(tick);
       _amountState.set(node, { value: target, raf: id });
@@ -1898,18 +2066,10 @@ function renderCash() {
   const pills = $("#cash-pills");
   clear(pills);
   pills.appendChild(
-    el(
-      "span",
-      { class: "hero-pill gain" },
-      "+ ₺" + t.income.toLocaleString("tr-TR"),
-    ),
+    el("span", { class: "hero-pill gain" }, "+ " + fmt.try(t.income)),
   );
   pills.appendChild(
-    el(
-      "span",
-      { class: "hero-pill neg" },
-      "− ₺" + t.expense.toLocaleString("tr-TR"),
-    ),
+    el("span", { class: "hero-pill neg" }, "− " + fmt.try(t.expense)),
   );
 
   $("#month-label").textContent = fmt.monthLabel(viewMonth);
@@ -2138,7 +2298,7 @@ function renderTxList(list) {
         {
           class: `row-amount ${t.type === "income" ? "pos" : "neg"}`,
         },
-        `${sign}${fmt.int(t.amount).replace(/^-/, "")} ₺`,
+        `${sign}${fmt.int(t.amount).replace(/^-/, "")} ${currencyMeta().sym}`,
       ),
     );
     wrap.appendChild(row);
@@ -2237,7 +2397,11 @@ function renderPending() {
 
     const stack = el("div", { class: "row-stack" });
     stack.appendChild(
-      el("div", { class: "row-amount bold" }, fmt.int(p.amount) + " ₺"),
+      el(
+        "div",
+        { class: "row-amount bold" },
+        fmt.int(p.amount) + " " + currencyMeta().sym,
+      ),
     );
     stack.appendChild(
       el(
@@ -2293,7 +2457,7 @@ function renderSilver() {
       el(
         "span",
         { class: `hero-pill ${cls}` },
-        `${sign} ₺${fmt.int(Math.abs(totalPl))}`,
+        `${sign} ${currencyMeta().sym}${fmt.int(Math.abs(totalPl))}`,
       ),
     );
     pills.appendChild(
@@ -2858,7 +3022,7 @@ const CollectSheet = (() => {
       null;
 
     $("#collect-source").textContent = p.source;
-    $("#collect-pre-amount").textContent = "₺" + fmt.int(p.amount);
+    $("#collect-pre-amount").textContent = fmt.try(p.amount);
     $("#collect-amount").value = inputAmount(p.amount);
     $("#collect-date").value = todayISO();
     renderCats();
@@ -3284,6 +3448,7 @@ const Settings = (() => {
     $$("[data-lang-opt]").forEach((b) =>
       b.classList.toggle("active", b.dataset.langOpt === cur),
     );
+    Currency.init();
     Sheets.open("sheet-settings");
   }
   function exportData() {
@@ -3540,8 +3705,17 @@ const Settings = (() => {
         $$("[data-lang-opt]").forEach((x) =>
           x.classList.toggle("active", x.dataset.langOpt === cur),
         );
+        Currency.renderFxMeta();
       });
     });
+    $$("[data-currency-opt]").forEach((b) => {
+      b.addEventListener("click", () => {
+        Currency.set(b.dataset.currencyOpt);
+        Haptics.light();
+      });
+    });
+    const fxBtn = $("#fx-fetch-btn");
+    if (fxBtn) fxBtn.addEventListener("click", () => Currency.fetchRates());
   }
   return { open, bind };
 })();

@@ -2063,6 +2063,12 @@ html[data-theme="dark"] .chip.active {
 .settings-row .ic.recurring {
   background: linear-gradient(135deg, #38c97e, #007a5e);
 }
+.settings-row .ic.currency {
+  background: linear-gradient(135deg, #ffd24d, #f0a030);
+}
+.settings-row .ic.fx {
+  background: linear-gradient(135deg, #4fc1d6, #1d8aa8);
+}
 
 /* Budget editor */
 .budget-hint {

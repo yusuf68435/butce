@@ -144,6 +144,7 @@ const APP_PLUS_EXPORTS =
   I18N, Lang, t, Theme, Privacy, Haptics, Store, Sheets, Toast,
   Confirm, Prompt, DatePicker, Budgets, ETA_OPTIONS, ETA_LABELS,
   CATEGORY_META, CHART_PALETTE, OUNCE_TO_GRAM,
+  CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -261,6 +262,51 @@ test("t() falls back to TR when key missing in EN", () => {
   sandbox.I18N.tr["test.fallback"] = "düşer";
   const v = sandbox.t("test.fallback");
   assert.equal(v, "düşer");
+});
+
+test("currencyMeta returns symbol/locale by code", () => {
+  assert.equal(sandbox.currencyMeta("TRY").sym, "₺");
+  assert.equal(sandbox.currencyMeta("USD").sym, "$");
+  assert.equal(sandbox.currencyMeta("EUR").sym, "€");
+  assert.equal(sandbox.currencyMeta("USD").locale, "en-US");
+});
+
+test("convertFromTry: TRY identity (default state)", () => {
+  // default settings.currency is undefined → "TRY"
+  assert.equal(sandbox.currentCurrency(), "TRY");
+  assert.equal(sandbox.convertFromTry(1000), 1000);
+  assert.equal(sandbox.convertFromTry(0), 0);
+  assert.equal(sandbox.convertFromTry(-500), -500);
+});
+
+test("convertFromTry: applies FX rate when currency switched", () => {
+  sandbox.FX.save({ TRY: 1, USD: 0.05, EUR: 0.04, ts: 1234 });
+  sandbox.Store.update((s) => {
+    s.settings = s.settings || {};
+    s.settings.currency = "USD";
+  });
+  assert.equal(sandbox.convertFromTry(1000), 50);
+  sandbox.Store.update((s) => {
+    s.settings.currency = "EUR";
+  });
+  assert.equal(sandbox.convertFromTry(1000), 40);
+  // Reset back to TRY for subsequent tests
+  sandbox.Store.update((s) => {
+    s.settings.currency = "TRY";
+  });
+});
+
+test("fmt.try uses display currency symbol", () => {
+  // currency=TRY (reset above)
+  assert.equal(sandbox.fmt.try(1234), "₺1.234");
+  sandbox.Store.update((s) => {
+    s.settings.currency = "USD";
+  });
+  // 1000 TRY × 0.05 = 50 → "$50"
+  assert.equal(sandbox.fmt.try(1000), "$50");
+  sandbox.Store.update((s) => {
+    s.settings.currency = "TRY";
+  });
 });
 
 // Run

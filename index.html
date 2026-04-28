@@ -45,7 +45,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=27" />
+    <link rel="stylesheet" href="style.css?v=28" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -686,6 +686,35 @@
                 <button class="seg-opt" data-lang-opt="en">EN</button>
               </div>
             </div>
+            <div class="settings-row">
+              <div class="ic currency" data-icon="cash"></div>
+              <div>
+                <div class="label" data-i18n="settings.currency">
+                  Para Birimi
+                </div>
+                <div class="sub" data-i18n="settings.currencySub">
+                  Görüntüleme dövizi (veriler ₺ olarak saklanır)
+                </div>
+              </div>
+              <div class="seg" style="--n: 3; min-width: 150px">
+                <span class="seg-thumb" id="currency-thumb"></span>
+                <button class="seg-opt" data-currency-opt="TRY">₺</button>
+                <button class="seg-opt" data-currency-opt="USD">$</button>
+                <button class="seg-opt" data-currency-opt="EUR">€</button>
+              </div>
+            </div>
+            <button type="button" class="settings-row" id="fx-fetch-btn">
+              <div class="ic fx" data-icon="repeat"></div>
+              <div>
+                <div class="label" data-i18n="settings.fxFetch">
+                  Güncel Kuru Çek
+                </div>
+                <div class="sub" id="fx-meta" data-i18n="settings.fxFetchSub">
+                  Frankfurter.app — internet gerekir
+                </div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
           </div>
         </section>
 
@@ -1010,6 +1039,6 @@
       </form>
     </div>
 
-    <script src="app.js?v=27" defer></script>
+    <script src="app.js?v=28" defer></script>
   </body>
 </html>
