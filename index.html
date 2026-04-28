@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta
+      name="theme-color"
+      content="#f4f5f8"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#05070d"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Bütçe" />
+    <meta name="application-name" content="Bütçe" />
+    <link rel="manifest" href="manifest.json" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%231b2547'/><stop offset='1' stop-color='%230e1428'/></linearGradient></defs><rect width='180' height='180' rx='40' fill='url(%23g)'/><circle cx='139' cy='41' r='42' fill='%2300e08f' opacity='.55'/><text x='90' y='120' font-family='-apple-system,system-ui' font-size='102' font-weight='700' fill='white' text-anchor='middle'>%E2%82%BA</text></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="style.css?v=20" />
+    <title>Bütçe</title>
+  </head>
+  <body>
+    <div class="viewport">
+      <div class="app">
+        <header class="topbar">
+          <button
+            class="icon-btn"
+            id="open-settings"
+            aria-label="Ayarlar"
+            data-icon="settings"
+          ></button>
+          <h1 class="topbar-title" id="topbar-title">Nakit</h1>
+          <button
+            class="icon-btn accent"
+            id="header-add"
+            aria-label="Yeni"
+            data-icon="plus"
+          ></button>
+        </header>
+
+        <div class="scroll" id="scroll-root">
+          <!-- ============================================================
+               CASH PAGE
+               ============================================================ -->
+          <section class="page active" data-page="cash">
+            <div class="hero-shell cash">
+              <div class="hero-layer back"></div>
+              <div class="hero-layer mid"></div>
+              <div class="hero cash" id="cash-hero">
+                <span
+                  class="hero-glyph"
+                  data-icon="wallet"
+                  aria-hidden="true"
+                ></span>
+                <div class="hero-eyebrow">Bu Ay Bakiye</div>
+                <div
+                  class="hero-amount"
+                  id="cash-amount"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <span class="currency">₺</span><span class="int">0</span>
+                </div>
+                <div class="hero-pills" id="cash-pills"></div>
+                <div class="hero-spark" id="cash-spark"></div>
+              </div>
+            </div>
+
+            <div class="month-pill-wrap">
+              <button class="month-pill" id="month-pill">
+                <span id="month-label">—</span>
+                <span data-icon="chevron-down"></span>
+              </button>
+            </div>
+
+            <section class="section">
+              <div class="section-title">Toplam Servet</div>
+              <div class="wealth" id="wealth-card">
+                <div class="wealth-eyebrow">Toplam</div>
+                <div class="wealth-amount" id="wealth-amount">
+                  <span class="currency">₺</span><span class="int">0</span>
+                </div>
+                <div class="wealth-stack" id="wealth-stack">
+                  <i class="cash"></i>
+                  <i class="pending"></i>
+                  <i class="silver"></i>
+                </div>
+                <div class="wealth-legend" id="wealth-legend"></div>
+              </div>
+            </section>
+
+            <section class="section" id="expense-section">
+              <div class="section-title">Gider Dağılımı</div>
+              <div class="chart-card">
+                <div class="donut" id="expense-donut"></div>
+                <div class="bar-list" id="expense-bars"></div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-title">Hareketler</div>
+              <div class="card" id="tx-list"></div>
+            </section>
+          </section>
+
+          <!-- ============================================================
+               PENDING PAGE
+               ============================================================ -->
+          <section class="page" data-page="pending">
+            <div class="hero-shell pending">
+              <div class="hero-layer back"></div>
+              <div class="hero-layer mid"></div>
+              <div class="hero pending">
+                <span
+                  class="hero-glyph"
+                  data-icon="hourglass"
+                  aria-hidden="true"
+                ></span>
+                <div class="hero-eyebrow">Toplam Beklenen</div>
+                <div
+                  class="hero-amount"
+                  id="pending-amount"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <span class="currency">₺</span><span class="int">0</span>
+                </div>
+                <div class="hero-pills" id="pending-pills"></div>
+                <div class="hero-spark" id="pending-spark"></div>
+              </div>
+            </div>
+
+            <section class="section">
+              <div class="section-title">Tahsilatlar</div>
+              <div class="card" id="pending-list"></div>
+            </section>
+          </section>
+
+          <!-- ============================================================
+               SILVER PAGE
+               ============================================================ -->
+          <section class="page" data-page="silver">
+            <div class="hero-shell silver">
+              <div class="hero-layer back"></div>
+              <div class="hero-layer mid"></div>
+              <div class="hero silver">
+                <span
+                  class="hero-glyph"
+                  data-icon="diamond"
+                  aria-hidden="true"
+                ></span>
+                <div class="hero-eyebrow">Güncel Değer</div>
+                <div
+                  class="hero-amount"
+                  id="silver-amount"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <span class="currency">₺</span><span class="int">0</span>
+                </div>
+                <div class="hero-pills" id="silver-pills"></div>
+                <div class="hero-spark" id="silver-spark"></div>
+              </div>
+            </div>
+
+            <section class="section">
+              <div class="section-title">Gram Fiyatı</div>
+              <div class="price-card">
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  id="silver-gram-price"
+                  placeholder="0"
+                />
+                <span class="unit">₺/gr</span>
+                <button class="pull-btn" id="fetch-price-btn">Çek</button>
+              </div>
+              <div class="price-hint" id="price-meta"></div>
+            </section>
+
+            <section class="section">
+              <div class="section-title">Pozisyonlar</div>
+              <div class="card" id="silver-list"></div>
+            </section>
+          </section>
+        </div>
+
+        <nav
+          class="tabbar"
+          role="tablist"
+          aria-label="Bölümler"
+          aria-orientation="horizontal"
+        >
+          <span
+            class="tabbar-indicator"
+            id="tabbar-indicator"
+            aria-hidden="true"
+          ></span>
+          <button
+            class="tab active"
+            data-target="cash"
+            role="tab"
+            aria-selected="true"
+          >
+            <span data-icon="cash"></span>
+            <span>Nakit</span>
+          </button>
+          <button
+            class="tab"
+            data-target="pending"
+            role="tab"
+            aria-selected="false"
+          >
+            <span data-icon="hourglass"></span>
+            <span>Bekleyen</span>
+          </button>
+          <button
+            class="tab"
+            data-target="silver"
+            role="tab"
+            aria-selected="false"
+          >
+            <span data-icon="diamond"></span>
+            <span>Gümüş</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SHEETS (scrim + sheet pattern)
+         ============================================================ -->
+    <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+    <!-- Transaction sheet -->
+    <div
+      class="sheet"
+      id="sheet-tx"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tx-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="tx-title">Yeni Hareket</h2>
+        <button class="sheet-action right bold" id="tx-save">Kaydet</button>
+      </header>
+      <form class="sheet-body sheet-stagger" id="tx-form" novalidate>
+        <div class="seg" style="--n: 2">
+          <span class="seg-thumb" id="tx-thumb"></span>
+          <button type="button" class="seg-opt active" data-tx-type="expense">
+            Gider
+          </button>
+          <button type="button" class="seg-opt" data-tx-type="income">
+            Gelir
+          </button>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Tutar</div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="tx-amount"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Kategori</div>
+          <div class="chips" id="tx-cat-grid"></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Açıklama</div>
+          <input
+            type="text"
+            id="tx-desc"
+            class="input"
+            placeholder="Opsiyonel"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Tarih</div>
+          <input type="date" id="tx-date" class="input" />
+        </div>
+
+        <button
+          type="button"
+          class="sheet-action danger"
+          id="tx-delete"
+          hidden
+          style="
+            text-align: center;
+            padding: 14px;
+            background: var(--bg-2);
+            border-radius: var(--r-input);
+            margin-top: 14px;
+            border: 1px solid var(--hairline);
+          "
+        >
+          Hareketi Sil
+        </button>
+      </form>
+    </div>
+
+    <!-- Pending sheet -->
+    <div
+      class="sheet"
+      id="sheet-pending"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pending-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="pending-title">Yeni Bekleyen</h2>
+        <button class="sheet-action right bold" id="pending-save">
+          Kaydet
+        </button>
+      </header>
+      <form class="sheet-body sheet-stagger" id="pending-form" novalidate>
+        <div class="field">
+          <div class="field-label">Kimden / Ne için</div>
+          <input
+            type="text"
+            id="pending-source"
+            class="input"
+            placeholder="Örn. UYART projesi"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Tutar</div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="pending-amount-in"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Zaman Tahmini</div>
+          <div class="chips" id="eta-grid"></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Kesin Tarih (opsiyonel)</div>
+          <input type="date" id="pending-date" class="input" />
+        </div>
+
+        <button
+          type="button"
+          class="sheet-action danger"
+          id="pending-delete"
+          hidden
+          style="
+            text-align: center;
+            padding: 14px;
+            background: var(--bg-2);
+            border-radius: var(--r-input);
+            margin-top: 14px;
+            border: 1px solid var(--hairline);
+          "
+        >
+          Bekleyeni Sil
+        </button>
+      </form>
+    </div>
+
+    <!-- Collect sheet -->
+    <div
+      class="sheet"
+      id="sheet-collect"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="collect-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="collect-title">Tahsilat Geldi</h2>
+        <button class="sheet-action right bold" id="collect-save">Aktar</button>
+      </header>
+      <form class="sheet-body sheet-stagger" id="collect-form" novalidate>
+        <div class="mini-hero" id="collect-hero">
+          <div class="mini-hero-eyebrow" id="collect-source"></div>
+          <div class="mini-hero-amount" id="collect-pre-amount">₺0</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Tutar</div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="collect-amount"
+            class="input"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Gelir Kategorisi</div>
+          <div class="chips" id="collect-cat-grid"></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Tarih</div>
+          <input type="date" id="collect-date" class="input" />
+        </div>
+      </form>
+    </div>
+
+    <!-- Silver sheet -->
+    <div
+      class="sheet"
+      id="sheet-silver"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="silver-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="silver-title">Yeni Pozisyon</h2>
+        <button class="sheet-action right bold" id="silver-save">Kaydet</button>
+      </header>
+      <form class="sheet-body sheet-stagger" id="silver-form" novalidate>
+        <div class="seg" style="--n: 3">
+          <span class="seg-thumb" id="silver-thumb"></span>
+          <button type="button" class="seg-opt active" data-silver-kind="gram">
+            Gram
+          </button>
+          <button type="button" class="seg-opt" data-silver-kind="ounce">
+            Ons
+          </button>
+          <button type="button" class="seg-opt" data-silver-kind="fund">
+            Fon
+          </button>
+        </div>
+
+        <div class="field">
+          <div class="field-label" id="silver-amt-label">Miktar (gr)</div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="silver-amount-in"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label" id="silver-buy-label">
+            Alış Birim Fiyatı (₺/gr)
+          </div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="silver-buy-price"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Alış Tarihi (opsiyonel)</div>
+          <input type="date" id="silver-buy-date" class="input" />
+        </div>
+
+        <div class="field" id="silver-current-field" hidden>
+          <div class="field-label" id="silver-current-label">
+            Güncel Birim Fiyatı (₺/gr)
+          </div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="silver-current-price"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label" id="silver-target-label">
+            Hedef Satış Fiyatı (₺/gr, opsiyonel)
+          </div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="silver-target"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <button
+          type="button"
+          class="sheet-action danger"
+          id="silver-delete"
+          hidden
+          style="
+            text-align: center;
+            padding: 14px;
+            background: var(--bg-2);
+            border-radius: var(--r-input);
+            margin-top: 14px;
+            border: 1px solid var(--hairline);
+          "
+        >
+          Pozisyonu Sil
+        </button>
+      </form>
+    </div>
+
+    <!-- Month picker sheet -->
+    <div
+      class="sheet"
+      id="sheet-month"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="month-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>Kapat</button>
+        <h2 class="title" id="month-title">Ay Seç</h2>
+        <button class="sheet-action right" id="month-today">Bu Ay</button>
+      </header>
+      <div class="sheet-body">
+        <div class="year-row">
+          <button
+            class="yr-btn"
+            id="year-prev"
+            aria-label="Önceki yıl"
+            data-icon="chevron-left"
+          ></button>
+          <span class="y" id="year-label">—</span>
+          <button
+            class="yr-btn"
+            id="year-next"
+            aria-label="Sonraki yıl"
+            data-icon="chevron-right"
+          ></button>
+        </div>
+        <div class="mgrid" id="month-grid"></div>
+
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Son Aylar</div>
+          <div class="card" id="month-history"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Settings sheet -->
+    <div
+      class="sheet"
+      id="sheet-settings"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>Kapat</button>
+        <h2 class="title" id="settings-title">Ayarlar</h2>
+        <span></span>
+      </header>
+      <div class="sheet-body">
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Görünüm</div>
+          <div class="card">
+            <div class="settings-row">
+              <div class="ic theme" data-icon="moon"></div>
+              <div>
+                <div class="label">Tema</div>
+                <div class="sub" id="theme-sub">Sistem ile uyumlu</div>
+              </div>
+              <div class="seg" style="--n: 3; min-width: 150px">
+                <span class="seg-thumb" id="theme-thumb"></span>
+                <button class="seg-opt" data-theme-opt="auto">Auto</button>
+                <button class="seg-opt" data-theme-opt="light">Açık</button>
+                <button class="seg-opt" data-theme-opt="dark">Koyu</button>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="settings-row"
+              id="privacy-toggle"
+              aria-pressed="false"
+            >
+              <div class="ic privacy" data-icon="eye"></div>
+              <div>
+                <div class="label">Bakiyeyi Gizle</div>
+                <div class="sub" id="privacy-sub">
+                  Tutarları yıldız (•••) olarak göster
+                </div>
+              </div>
+              <span class="switch" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Yedekleme</div>
+          <div class="card">
+            <button type="button" class="settings-row" id="export-btn">
+              <div class="ic dl" data-icon="arrow-down"></div>
+              <div>
+                <div class="label">Yedek İndir</div>
+                <div class="sub" id="export-sub">Tüm verilerin tek dosyada</div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
+            <button type="button" class="settings-row" id="import-btn">
+              <div class="ic up" data-icon="arrow-up"></div>
+              <div>
+                <div class="label">Yedekten Yükle</div>
+                <div class="sub">Mevcut verinin üzerine yazılır</div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Tehlikeli Bölge</div>
+          <div class="card">
+            <button type="button" class="settings-row" id="reset-btn">
+              <div class="ic danger" data-icon="trash"></div>
+              <div>
+                <div class="label danger">Tüm Veriyi Sil</div>
+                <div class="sub">Bu işlem geri alınamaz</div>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        <div class="settings-meta" id="settings-meta"></div>
+      </div>
+    </div>
+
+    <input
+      type="file"
+      id="import-file"
+      accept="application/json,.json"
+      hidden
+    />
+
+    <!-- Date picker sheet (custom wheel) -->
+    <div
+      class="sheet sheet-narrow date-sheet"
+      id="sheet-date"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="date-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="date-title">Tarih Seç</h2>
+        <button class="sheet-action right bold" id="date-accept">Tamam</button>
+      </header>
+      <div class="sheet-body">
+        <div class="date-wheels" id="date-wheels">
+          <div class="wheel" data-wheel="day"></div>
+          <div class="wheel" data-wheel="month"></div>
+          <div class="wheel" data-wheel="year"></div>
+          <div class="wheel-overlay" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast host (aria-live for screen readers) -->
+    <div
+      class="toast-host"
+      id="toast-host"
+      role="status"
+      aria-live="polite"
+      aria-atomic="false"
+    ></div>
+
+    <!-- Confirm dialog (sheet pattern, generic) -->
+    <div
+      class="sheet sheet-narrow"
+      id="sheet-confirm"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-body"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <div class="sheet-body confirm-body">
+        <h2 class="confirm-title" id="confirm-title">Emin misiniz?</h2>
+        <p class="confirm-text" id="confirm-body"></p>
+        <div class="confirm-actions">
+          <button type="button" class="confirm-btn cancel" id="confirm-cancel">
+            Vazgeç
+          </button>
+          <button type="button" class="confirm-btn primary" id="confirm-accept">
+            Tamam
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prompt dialog (sheet pattern, generic) -->
+    <div
+      class="sheet sheet-narrow"
+      id="sheet-prompt"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="prompt-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="prompt-title">Yeni Kayıt</h2>
+        <button class="sheet-action right bold" id="prompt-accept">
+          Tamam
+        </button>
+      </header>
+      <form class="sheet-body" id="prompt-form" novalidate>
+        <div class="field">
+          <div class="field-label" id="prompt-label">Ad</div>
+          <input type="text" id="prompt-input" class="input" />
+        </div>
+      </form>
+    </div>
+
+    <script src="app.js?v=20" defer></script>
+  </body>
+</html>

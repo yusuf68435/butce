@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Generated artifacts
+screenshots/
+
+# Local backups
+butce-yedek-*.json
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# Local Claude state
+.claude/
+
+# Sibling Expo project (separate repo)
+butce-mobile/

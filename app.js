@@ -1,0 +1,2770 @@
+"use strict";
+
+/* ==========================================================================
+   CONSTANTS
+   ========================================================================== */
+
+const STORAGE_KEY = "ggai:state:v1";
+const STATE_VERSION = 1;
+const OUNCE_TO_GRAM = 31.1035;
+const AGED_DAYS = 60;
+
+const TR_MONTHS = [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
+];
+const TR_MONTHS_SHORT = [
+  "Oca",
+  "Şub",
+  "Mar",
+  "Nis",
+  "May",
+  "Haz",
+  "Tem",
+  "Ağu",
+  "Eyl",
+  "Eki",
+  "Kas",
+  "Ara",
+];
+
+const DEFAULT_CATEGORIES = {
+  income: ["Maaş/Proje", "Kira (gelen)", "Diğer gelir"],
+  expense: [
+    "Kira/Ev",
+    "Market",
+    "Yakıt/Ulaşım",
+    "Fatura",
+    "Yemek",
+    "Ofis/UYART",
+    "Sağlık",
+    "Diğer gider",
+  ],
+};
+
+// rowKind drives gradient ikonu (.row-icon.<kind>)
+const CATEGORY_META = {
+  "Maaş/Proje": { icon: "briefcase", kind: "salary" },
+  "Kira (gelen)": { icon: "key", kind: "rent-in" },
+  "Diğer gelir": { icon: "sparkles", kind: "salary" },
+  "Kira/Ev": { icon: "house", kind: "home" },
+  Market: { icon: "cart", kind: "market" },
+  "Yakıt/Ulaşım": { icon: "fuel", kind: "fuel" },
+  Fatura: { icon: "doc", kind: "bills" },
+  Yemek: { icon: "fork", kind: "food" },
+  "Ofis/UYART": { icon: "building", kind: "home" },
+  Sağlık: { icon: "heart", kind: "health" },
+  "Diğer gider": { icon: "dot", kind: "home" },
+};
+
+const ETA_OPTIONS = [
+  { key: "unknown", label: "Belirsiz" },
+  { key: "thisWeek", label: "Bu hafta" },
+  { key: "thisMonth", label: "Bu ay" },
+  { key: "1to3m", label: "1-3 ay" },
+  { key: "3mPlus", label: "3 ay+" },
+];
+const ETA_LABELS = Object.fromEntries(ETA_OPTIONS.map((o) => [o.key, o.label]));
+
+const SILVER_KIND_LABEL = { gram: "Gram", ounce: "Ons", fund: "Fon" };
+const SILVER_KIND_UNIT = { gram: "gr", ounce: "ons", fund: "adet" };
+
+// donut/bar palette
+const CHART_PALETTE = [
+  "#00E08F",
+  "#FF7A45",
+  "#7E4DFF",
+  "#1E7CE0",
+  "#E5476A",
+  "#F0A030",
+  "#00B574",
+  "#5C7BFF",
+  "#FFB020",
+];
+
+const PRICE_ENDPOINT = "https://finans.truncgil.com/today.json";
+
+/* ==========================================================================
+   ICONS
+   ========================================================================== */
+
+const ICONS = {
+  settings:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7 4.4l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  "chevron-down":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  "chevron-left":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  "chevron-right":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+  cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M5 9v6M19 9v6"/></svg>',
+  hourglass:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12M7 3v4a5 5 0 0 0 10 0V3M7 21v-4a5 5 0 0 1 10 0v4"/></svg>',
+  diamond:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20"/><path d="M12 3 8 9l4 12 4-12-4-6Z"/></svg>',
+  "arrow-down":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+  "arrow-up":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  trash:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  briefcase:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  house:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>',
+  key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4M18 5l3 3M15 8l3 3"/></svg>',
+  sparkles:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>',
+  cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.3a2 2 0 0 0 2 1.7h7.6a2 2 0 0 0 2-1.6L21 8H6"/></svg>',
+  fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h12V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2zM7 8h6"/><path d="M15 9h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9l-3-3"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>',
+  fork: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v8a2 2 0 0 0 2 2v10M11 2v8a2 2 0 0 1-2 2M16 2c-1.5 1.5-2 4-2 6s.5 4 2 5v9"/></svg>',
+  building:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-5h6v5M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>',
+  heart:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 16.5 3 5.5 5.5 0 0 0 12 5.5 5.5 5.5 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.2 1.5 4 3 5.5l7 7z"/></svg>',
+  dot: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/></svg>',
+  wallet:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 9h18M16 14h2"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+  trend:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-8M14 7h7v7"/></svg>',
+  inbox:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  "eye-off":
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 7 10 7-.6 1.2-1.4 2.3-2.4 3.3M6.5 6.5C3.4 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.3 4.3-.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+};
+
+function hydrateIcons(root = document) {
+  root.querySelectorAll("[data-icon]").forEach((el) => {
+    const name = el.dataset.icon;
+    const svg = ICONS[name];
+    if (svg && el.innerHTML !== svg) el.innerHTML = svg;
+    if (!el.hasAttribute("aria-label") && !el.hasAttribute("aria-hidden")) {
+      el.setAttribute("aria-hidden", "true");
+    }
+    const inner = el.querySelector("svg");
+    if (inner && !inner.hasAttribute("aria-hidden")) {
+      inner.setAttribute("aria-hidden", "true");
+      inner.setAttribute("focusable", "false");
+    }
+  });
+}
+
+/* ==========================================================================
+   STORE
+   ========================================================================== */
+
+const Store = (() => {
+  const subs = new Set();
+  let data = load();
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return fresh();
+      const p = JSON.parse(raw);
+      return {
+        transactions: p.transactions || [],
+        pending: p.pending || [],
+        silver: p.silver || [],
+        categories: {
+          income: p.categories?.income || [...DEFAULT_CATEGORIES.income],
+          expense: p.categories?.expense || [...DEFAULT_CATEGORIES.expense],
+        },
+        settings: p.settings || {},
+      };
+    } catch {
+      return fresh();
+    }
+  }
+  function fresh() {
+    return {
+      transactions: [],
+      pending: [],
+      silver: [],
+      categories: {
+        income: [...DEFAULT_CATEGORIES.income],
+        expense: [...DEFAULT_CATEGORIES.expense],
+      },
+      settings: {},
+    };
+  }
+  let writeTimer = 0;
+  function writeNow() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (err) {
+      if (typeof Toast !== "undefined" && Toast.show) {
+        Toast.show("Depolama dolu — yedek alıp temizle", "error", {
+          duration: 4500,
+        });
+      }
+      console.error("[Store] persist failed:", err);
+    }
+  }
+  function persist() {
+    // Debounced write (rapid edits coalesce); subscribers fire immediately so UI stays in sync.
+    clearTimeout(writeTimer);
+    writeTimer = setTimeout(writeNow, 200);
+    subs.forEach((fn) => fn(data));
+  }
+  // Make sure pending writes flush before unload
+  window.addEventListener("pagehide", () => {
+    if (writeTimer) {
+      clearTimeout(writeTimer);
+      writeTimer = 0;
+      writeNow();
+    }
+  });
+  return {
+    get state() {
+      return data;
+    },
+    subscribe(fn) {
+      subs.add(fn);
+      return () => subs.delete(fn);
+    },
+    update(mutator) {
+      mutator(data);
+      persist();
+    },
+    replace(next) {
+      data = next;
+      persist();
+    },
+    reset() {
+      data = fresh();
+      persist();
+    },
+  };
+})();
+
+/* ==========================================================================
+   FORMATTERS
+   ========================================================================== */
+
+const fmt = {
+  try(n) {
+    const v = Math.round(Number(n) || 0);
+    const sign = v < 0 ? "-" : "";
+    return `${sign}₺${Math.abs(v).toLocaleString("tr-TR")}`;
+  },
+  int(n) {
+    const v = Math.round(Number(n) || 0);
+    return Math.abs(v).toLocaleString("tr-TR");
+  },
+  num(n, opts = {}) {
+    return Number(n || 0).toLocaleString("tr-TR", opts);
+  },
+  signed(n) {
+    const v = Math.round(Number(n) || 0);
+    if (v === 0) return fmt.try(0);
+    return (v > 0 ? "+" : "−") + "₺" + Math.abs(v).toLocaleString("tr-TR");
+  },
+  date(iso) {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
+  },
+  monthLabel(key) {
+    const [y, m] = key.split("-").map(Number);
+    return `${TR_MONTHS[m - 1]} ${y}`;
+  },
+  pct(v, digits = 1) {
+    return `${v >= 0 ? "+" : ""}${v.toFixed(digits)}%`;
+  },
+  time(iso) {
+    return new Date(iso).toLocaleTimeString("tr-TR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  },
+};
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function currentMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function monthKeyOf(iso) {
+  return iso.slice(0, 7);
+}
+function daysSince(iso) {
+  if (!iso) return 0;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+function parseAmount(input) {
+  if (typeof input !== "string") input = String(input ?? "");
+  const cleaned = input
+    .replace(/\./g, "")
+    .replace(",", ".")
+    .replace(/[^\d.-]/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+function inputAmount(n) {
+  return n ? String(n).replace(".", ",") : "";
+}
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "dataset") Object.assign(e.dataset, v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    e.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+function categoryMeta(name) {
+  return CATEGORY_META[name] || { icon: "dot", kind: "home" };
+}
+
+/* ==========================================================================
+   PRIVACY MODE (hide balance with dots)
+   ========================================================================== */
+
+const Privacy = (() => {
+  const KEY = "ggai:privacy";
+  function get() {
+    return localStorage.getItem(KEY) === "1";
+  }
+  function set(on) {
+    if (on) localStorage.setItem(KEY, "1");
+    else localStorage.removeItem(KEY);
+    apply();
+  }
+  function toggle() {
+    set(!get());
+  }
+  function apply() {
+    const on = get();
+    document.documentElement.toggleAttribute("data-privacy", on);
+    const btn = $("#privacy-toggle");
+    if (btn) {
+      btn.setAttribute("aria-pressed", String(on));
+      const sub = $("#privacy-sub");
+      if (sub)
+        sub.textContent = on
+          ? "Tutarlar gizli — dokunmak için tekrar aç"
+          : "Tutarları yıldız (•••) olarak göster";
+      const ic = btn.querySelector(".ic");
+      if (ic) ic.dataset.icon = on ? "eye-off" : "eye";
+      hydrateIcons(btn);
+    }
+  }
+  function init() {
+    apply();
+  }
+  return { init, toggle, get, set, apply };
+})();
+
+/* ==========================================================================
+   THEME (auto / light / dark)
+   ========================================================================== */
+
+const Theme = (() => {
+  const KEY = "ggai:theme";
+  function get() {
+    return localStorage.getItem(KEY) || "auto";
+  }
+  function apply(mode) {
+    const root = document.documentElement;
+    if (mode === "auto") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", mode);
+    localStorage.setItem(KEY, mode);
+    syncThumb();
+  }
+  function syncThumb() {
+    const mode = get();
+    const map = { auto: 0, light: 1, dark: 2 };
+    const thumb = $("#theme-thumb");
+    if (thumb) thumb.style.transform = `translateX(${map[mode] * 100}%)`;
+    $$("[data-theme-opt]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.themeOpt === mode),
+    );
+    const sub = $("#theme-sub");
+    if (sub) {
+      sub.textContent =
+        mode === "auto"
+          ? "Sistem ile uyumlu"
+          : mode === "light"
+            ? "Açık tema"
+            : "Koyu tema";
+    }
+  }
+  function init() {
+    apply(get());
+  }
+  return { init, apply, get, syncThumb };
+})();
+
+/* ==========================================================================
+   SHEETS (scrim + sheet pattern, manual transform)
+   ========================================================================== */
+
+const Sheets = (() => {
+  const stack = [];
+  const focusBefore = new Map();
+
+  function focusables(root) {
+    return Array.from(
+      root.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !el.closest("[hidden]"));
+  }
+
+  function trapKeydown(e) {
+    if (e.key !== "Tab" || !stack.length) return;
+    const sheet = stack[stack.length - 1];
+    const list = focusables(sheet);
+    if (!list.length) return;
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // History-driven so browser back/swipe-back closes the top sheet.
+  let suppressPop = false;
+
+  function open(id, onOpen) {
+    const node = $("#" + id);
+    if (!node) return;
+    focusBefore.set(node, document.activeElement);
+    stack.push(node);
+    $("#scrim").classList.add("open");
+    requestAnimationFrame(() => node.classList.add("open"));
+    document.body.style.overflow = "hidden";
+    history.pushState({ sheet: id, depth: stack.length }, "");
+    if (onOpen) onOpen(node);
+    hydrateIcons(node);
+    bindDrag(node);
+    setTimeout(() => {
+      const list = focusables(node);
+      if (list.length) list[0].focus();
+    }, 60);
+  }
+
+  // Drag-to-dismiss — only initiated from grabber or sheet-head; body keeps native scroll.
+  function bindDrag(sheet) {
+    if (sheet._dragBound) return;
+    sheet._dragBound = true;
+    let startY = 0;
+    let lastY = 0;
+    let lastT = 0;
+    let velocity = 0;
+    let dragging = false;
+    let pointerId = null;
+
+    const grabber = sheet.querySelector(".sheet-grabber");
+    const head = sheet.querySelector(".sheet-head, .confirm-body");
+    const handles = [grabber, head].filter(Boolean);
+
+    function onDown(e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      pointerId = e.pointerId;
+      startY = e.clientY;
+      lastY = e.clientY;
+      lastT = e.timeStamp || performance.now();
+      velocity = 0;
+      dragging = true;
+      sheet.classList.add("dragging");
+      sheet.setPointerCapture(pointerId);
+    }
+    function onMove(e) {
+      if (!dragging || e.pointerId !== pointerId) return;
+      const dy = Math.max(0, e.clientY - startY);
+      sheet.style.setProperty("--sheet-y", dy + "px");
+      const t = e.timeStamp || performance.now();
+      const dt = Math.max(1, t - lastT);
+      velocity = (e.clientY - lastY) / dt; // px/ms
+      lastY = e.clientY;
+      lastT = t;
+      // Fade scrim proportional to drag
+      const scrim = $("#scrim");
+      if (scrim) scrim.style.opacity = Math.max(0, 1 - dy / 320);
+    }
+    function onUp(e) {
+      if (!dragging || e.pointerId !== pointerId) return;
+      dragging = false;
+      sheet.classList.remove("dragging");
+      try {
+        sheet.releasePointerCapture(pointerId);
+      } catch {}
+      const dy = Math.max(0, e.clientY - startY);
+      const scrim = $("#scrim");
+      if (scrim) scrim.style.opacity = "";
+      // Dismiss if dragged > 110px OR fast downward flick
+      if (dy > 110 || velocity > 0.55) {
+        sheet.style.removeProperty("--sheet-y");
+        close(sheet.id);
+      } else {
+        sheet.style.removeProperty("--sheet-y");
+      }
+    }
+
+    handles.forEach((h) => {
+      h.addEventListener("pointerdown", onDown);
+      h.addEventListener("pointermove", onMove);
+      h.addEventListener("pointerup", onUp);
+      h.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  function close(id, fromPop = false) {
+    const node = id ? $("#" + id) : stack[stack.length - 1];
+    if (!node) return;
+    node.classList.remove("open");
+    const idx = stack.indexOf(node);
+    if (idx >= 0) stack.splice(idx, 1);
+    if (!stack.length) {
+      $("#scrim").classList.remove("open");
+      document.body.style.overflow = "";
+    }
+    if (!fromPop) {
+      // Pop the synthetic history entry we pushed when this sheet opened
+      suppressPop = true;
+      history.back();
+    }
+    const prev = focusBefore.get(node);
+    focusBefore.delete(node);
+    if (prev && typeof prev.focus === "function") {
+      try {
+        prev.focus();
+      } catch {}
+    }
+  }
+
+  window.addEventListener("popstate", () => {
+    if (suppressPop) {
+      suppressPop = false;
+      return;
+    }
+    if (stack.length) {
+      // Back/swipe-back ⇒ close top sheet without re-pushing.
+      const top = stack[stack.length - 1];
+      close(top.id, true);
+    }
+  });
+
+  function topId() {
+    return stack.length ? stack[stack.length - 1].id : null;
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && stack.length) close();
+    trapKeydown(e);
+  });
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "scrim") close();
+    if (e.target.closest("[data-sheet-close]")) {
+      const sheet = e.target.closest(".sheet");
+      if (sheet) close(sheet.id);
+    }
+  });
+
+  return { open, close, topId };
+})();
+
+/* ==========================================================================
+   TOAST / CONFIRM / PROMPT (custom dialogs)
+   ========================================================================== */
+
+const Toast = (() => {
+  const ICONS_INLINE = {
+    success:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+    error:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 12v4"/></svg>',
+  };
+
+  function show(message, kind = "info", { duration = 2400 } = {}) {
+    const host = $("#toast-host");
+    if (!host) return;
+    const node = el("div", { class: `toast ${kind}` });
+    node.innerHTML = `<span class="toast-icon">${ICONS_INLINE[kind] || ""}</span><span>${escapeText(message)}</span>`;
+    host.appendChild(node);
+    requestAnimationFrame(() => node.classList.add("show"));
+    setTimeout(() => {
+      node.classList.remove("show");
+      setTimeout(() => node.remove(), 360);
+    }, duration);
+  }
+
+  function escapeText(s) {
+    return String(s).replace(
+      /[&<>"]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+    );
+  }
+
+  return { show };
+})();
+
+const Confirm = (() => {
+  let resolver = null;
+
+  function show({
+    title = "Emin misiniz?",
+    message = "",
+    confirmLabel = "Tamam",
+    cancelLabel = "Vazgeç",
+    danger = false,
+  } = {}) {
+    return new Promise((resolve) => {
+      resolver = resolve;
+      $("#confirm-title").textContent = title;
+      $("#confirm-body").textContent = message;
+      $("#confirm-cancel").textContent = cancelLabel;
+      const accept = $("#confirm-accept");
+      accept.textContent = confirmLabel;
+      accept.classList.toggle("danger", !!danger);
+      Sheets.open("sheet-confirm");
+    });
+  }
+
+  function bind() {
+    $("#confirm-accept").addEventListener("click", () => {
+      const r = resolver;
+      resolver = null;
+      Sheets.close("sheet-confirm");
+      if (r) r(true);
+    });
+    $("#confirm-cancel").addEventListener("click", () => {
+      const r = resolver;
+      resolver = null;
+      Sheets.close("sheet-confirm");
+      if (r) r(false);
+    });
+    // scrim/escape close → resolve(false)
+    const sheet = $("#sheet-confirm");
+    new MutationObserver(() => {
+      if (resolver && !sheet.classList.contains("open")) {
+        const r = resolver;
+        resolver = null;
+        r(false);
+      }
+    }).observe(sheet, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  return { show, bind };
+})();
+
+const Prompt = (() => {
+  let resolver = null;
+
+  function show({ title = "Yeni Kayıt", label = "Ad", placeholder = "" } = {}) {
+    return new Promise((resolve) => {
+      resolver = resolve;
+      $("#prompt-title").textContent = title;
+      $("#prompt-label").textContent = label;
+      const input = $("#prompt-input");
+      input.value = "";
+      input.placeholder = placeholder;
+      Sheets.open("sheet-prompt", () => setTimeout(() => input.focus(), 80));
+    });
+  }
+
+  function accept() {
+    const r = resolver;
+    resolver = null;
+    const v = $("#prompt-input").value.trim();
+    Sheets.close("sheet-prompt");
+    if (r) r(v || null);
+  }
+
+  function bind() {
+    $("#prompt-accept").addEventListener("click", accept);
+    $("#prompt-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        accept();
+      }
+    });
+    const sheet = $("#sheet-prompt");
+    new MutationObserver(() => {
+      if (resolver && !sheet.classList.contains("open")) {
+        const r = resolver;
+        resolver = null;
+        r(null);
+      }
+    }).observe(sheet, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  return { show, bind };
+})();
+
+/* ==========================================================================
+   DATE PICKER (Apple-style 3-wheel)
+   ========================================================================== */
+
+const DatePicker = (() => {
+  let resolver = null;
+  let currentISO = null;
+  let yearStart = 2000;
+  let yearCount = 60;
+
+  const TR_FULL_MONTHS = TR_MONTHS;
+
+  function show({ value = null, title = "Tarih Seç" } = {}) {
+    return new Promise((resolve) => {
+      resolver = resolve;
+      $("#date-title").textContent = title;
+      const today = new Date();
+      const cy = today.getFullYear();
+      yearStart = cy - 30;
+      yearCount = 60;
+
+      const init = value
+        ? (() => {
+            const [y, m, d] = value.split("-").map(Number);
+            return { y, m, d };
+          })()
+        : { y: cy, m: today.getMonth() + 1, d: today.getDate() };
+
+      currentISO = isoOf(init.y, init.m, init.d);
+      buildWheel("day", daysInMonth(init.y, init.m), init.d - 1, (i) =>
+        String(i + 1),
+      );
+      buildWheel("month", 12, init.m - 1, (i) => TR_FULL_MONTHS[i]);
+      buildWheel("year", yearCount, init.y - yearStart, (i) =>
+        String(yearStart + i),
+      );
+      Sheets.open("sheet-date", () => {
+        // wheel scroll uses smooth — but on first open we want instant snap
+        $$("#sheet-date .wheel").forEach((w) => {
+          const sel = w.querySelector(".item.selected");
+          if (sel)
+            w.scrollTo({
+              top: sel.offsetTop - w.clientHeight / 2 + 20,
+              behavior: "auto",
+            });
+        });
+      });
+    });
+  }
+
+  function isoOf(y, m, d) {
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  function daysInMonth(y, m) {
+    return new Date(y, m, 0).getDate();
+  }
+
+  function buildWheel(kind, count, selectedIdx, label) {
+    const wheel = $(`#sheet-date .wheel[data-wheel="${kind}"]`);
+    if (!wheel) return;
+    clear(wheel);
+    for (let i = 0; i < count; i++) {
+      wheel.appendChild(
+        el(
+          "div",
+          {
+            class: `item${i === selectedIdx ? " selected" : ""}`,
+            dataset: { idx: i },
+          },
+          label(i),
+        ),
+      );
+    }
+    // bind scroll → update selected mid item
+    if (!wheel._bound) {
+      wheel._bound = true;
+      let raf = 0;
+      wheel.addEventListener(
+        "scroll",
+        () => {
+          if (raf) return;
+          raf = requestAnimationFrame(() => {
+            raf = 0;
+            const idx = Math.round(wheel.scrollTop / 40);
+            $$(".item", wheel).forEach((it, i) =>
+              it.classList.toggle("selected", i === idx),
+            );
+            updateFromWheels();
+          });
+        },
+        { passive: true },
+      );
+    }
+  }
+
+  function updateFromWheels() {
+    const dWheel = $('#sheet-date .wheel[data-wheel="day"]');
+    const mWheel = $('#sheet-date .wheel[data-wheel="month"]');
+    const yWheel = $('#sheet-date .wheel[data-wheel="year"]');
+    if (!dWheel || !mWheel || !yWheel) return;
+
+    const m = Math.round(mWheel.scrollTop / 40) + 1;
+    const y = Math.round(yWheel.scrollTop / 40) + yearStart;
+    const maxDay = daysInMonth(y, m);
+    let d = Math.round(dWheel.scrollTop / 40) + 1;
+    if (d > maxDay) {
+      d = maxDay;
+      // rebuild day wheel only if count needs to change
+      if ($$(".item", dWheel).length !== maxDay) {
+        const wasIdx = d - 1;
+        clear(dWheel);
+        for (let i = 0; i < maxDay; i++) {
+          dWheel.appendChild(
+            el(
+              "div",
+              {
+                class: `item${i === wasIdx ? " selected" : ""}`,
+                dataset: { idx: i },
+              },
+              String(i + 1),
+            ),
+          );
+        }
+        dWheel.scrollTo({ top: wasIdx * 40, behavior: "auto" });
+      }
+    } else if ($$(".item", dWheel).length !== maxDay) {
+      const wasIdx = d - 1;
+      clear(dWheel);
+      for (let i = 0; i < maxDay; i++) {
+        dWheel.appendChild(
+          el(
+            "div",
+            {
+              class: `item${i === wasIdx ? " selected" : ""}`,
+              dataset: { idx: i },
+            },
+            String(i + 1),
+          ),
+        );
+      }
+    }
+    currentISO = isoOf(y, m, d);
+  }
+
+  function accept() {
+    const r = resolver;
+    resolver = null;
+    Sheets.close("sheet-date");
+    if (r) r(currentISO);
+  }
+
+  function bind() {
+    $("#date-accept").addEventListener("click", accept);
+    const sheet = $("#sheet-date");
+    new MutationObserver(() => {
+      if (resolver && !sheet.classList.contains("open")) {
+        const r = resolver;
+        resolver = null;
+        r(null);
+      }
+    }).observe(sheet, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  return { show, bind };
+})();
+
+/* Wraps a native date input as a tap-to-open date-pill */
+function attachDatePill(inputEl, { title = "Tarih Seç", onSelect } = {}) {
+  if (!inputEl || inputEl._datePillWrapped) return;
+  inputEl._datePillWrapped = true;
+  const pill = el("button", {
+    type: "button",
+    class: "date-pill",
+    "aria-haspopup": "dialog",
+  });
+  const text = el("span", { class: "date-pill-text" });
+  const icon = el("span", {
+    class: "calendar-icon",
+    html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+  });
+  pill.appendChild(text);
+  pill.appendChild(icon);
+  inputEl.style.display = "none";
+  inputEl.parentNode.insertBefore(pill, inputEl.nextSibling);
+
+  function syncDisplay() {
+    const v = inputEl.value;
+    if (v) {
+      text.textContent = fmt.date(v);
+      text.classList.remove("placeholder");
+    } else {
+      const ph = inputEl.placeholder || "gg.aa.yyyy";
+      text.textContent = ph;
+      text.classList.add("placeholder");
+    }
+  }
+  syncDisplay();
+
+  pill.addEventListener("click", async () => {
+    const picked = await DatePicker.show({
+      value: inputEl.value || null,
+      title,
+    });
+    if (picked) {
+      inputEl.value = picked;
+      syncDisplay();
+      if (onSelect) onSelect(picked);
+      inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+
+  // Re-sync if .value changed externally
+  const obs = new MutationObserver(syncDisplay);
+  obs.observe(inputEl, { attributes: true, attributeFilter: ["value"] });
+  inputEl.addEventListener("input", syncDisplay);
+}
+
+/* ==========================================================================
+   PAGE / TAB ROUTER
+   ========================================================================== */
+
+let viewMonth = currentMonthKey();
+let pickerYear = new Date().getFullYear();
+let activeTab = "cash";
+
+const THEME_COLORS = {
+  cash: { light: "#1b2547", dark: "#0e1428" },
+  pending: { light: "#ff7a45", dark: "#c24a38" },
+  silver: { light: "#2a2d38", dark: "#14161e" },
+};
+
+function updateStatusBarColor(target) {
+  const lightMeta = document.querySelector(
+    'meta[name="theme-color"][media*="light"]',
+  );
+  const darkMeta = document.querySelector(
+    'meta[name="theme-color"][media*="dark"]',
+  );
+  const colors = THEME_COLORS[target];
+  if (!colors) return;
+  if (lightMeta) lightMeta.setAttribute("content", colors.light);
+  if (darkMeta) darkMeta.setAttribute("content", colors.dark);
+}
+
+function switchTab(target) {
+  activeTab = target;
+  $$(".page").forEach((p) =>
+    p.classList.toggle("active", p.dataset.page === target),
+  );
+  $$(".tab").forEach((t) => {
+    const isActive = t.dataset.target === target;
+    t.classList.toggle("active", isActive);
+    t.setAttribute("aria-selected", String(isActive));
+  });
+  // tabbar indicator slide + per-tab tint
+  const idx = ["cash", "pending", "silver"].indexOf(target);
+  const indicator = $("#tabbar-indicator");
+  if (indicator) {
+    indicator.style.transform = `translateX(${idx * 100}%)`;
+  }
+  const tabbar = $(".tabbar");
+  if (tabbar) tabbar.dataset.active = target;
+  // top-right add button + topbar title context
+  const titles = { cash: "Nakit", pending: "Bekleyen", silver: "Gümüş" };
+  $("#topbar-title").textContent = titles[target] || "";
+  updateStatusBarColor(target);
+  renderAll();
+}
+
+/* ==========================================================================
+   STATE-DERIVED
+   ========================================================================== */
+
+function txOfMonth(key) {
+  return Store.state.transactions.filter((t) => monthKeyOf(t.date) === key);
+}
+function silverUnitNow(p, gramPrice) {
+  if (p.currentPrice && p.currentPrice > 0) return p.currentPrice;
+  if (p.kind === "gram") return gramPrice;
+  if (p.kind === "ounce") return gramPrice * OUNCE_TO_GRAM;
+  return 0;
+}
+function silverStats(p, gramPrice) {
+  const unitNow = silverUnitNow(p, gramPrice);
+  const cost = p.amount * p.buyPrice;
+  const value = p.amount * unitNow;
+  const pl = value - cost;
+  const plPct = cost > 0 ? (pl / cost) * 100 : 0;
+  const targetHit = p.targetPrice > 0 && unitNow >= p.targetPrice;
+  return { unitNow, cost, value, pl, plPct, targetHit };
+}
+function totalsOf(monthKey) {
+  const list = txOfMonth(monthKey);
+  const income = list
+    .filter((t) => t.type === "income")
+    .reduce((s, t) => s + t.amount, 0);
+  const expense = list
+    .filter((t) => t.type === "expense")
+    .reduce((s, t) => s + t.amount, 0);
+  return { income, expense, balance: income - expense, list };
+}
+function wealthBreakdown() {
+  const cash = Store.state.transactions.reduce(
+    (s, t) => s + (t.type === "income" ? t.amount : -t.amount),
+    0,
+  );
+  const pending = Store.state.pending.reduce((s, p) => s + p.amount, 0);
+  const gramPrice = Number(Store.state.settings.silverGramPrice) || 0;
+  const silver = Store.state.silver.reduce(
+    (s, p) => s + p.amount * silverUnitNow(p, gramPrice),
+    0,
+  );
+  return { cash, pending, silver, total: cash + pending + silver };
+}
+
+/* monthly net balance trend for sparkline (last 6 months including current view) */
+function monthlyTrend(months = 6, mode = "balance") {
+  const out = [];
+  const [yy, mm] = viewMonth.split("-").map(Number);
+  for (let i = months - 1; i >= 0; i--) {
+    const date = new Date(yy, mm - 1 - i, 1);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      "0",
+    )}`;
+    const t = totalsOf(key);
+    let v = 0;
+    if (mode === "balance") v = t.balance;
+    else if (mode === "income") v = t.income;
+    else if (mode === "expense") v = t.expense;
+    out.push({ key, v });
+  }
+  return out;
+}
+
+/* ==========================================================================
+   AMOUNT SPLIT (currency + integer)
+   ========================================================================== */
+
+const _amountState = new WeakMap();
+function setAmount(node, value) {
+  const target = Math.round(Number(value) || 0);
+  const isNeg = target < 0;
+  node.classList.toggle("is-negative", isNeg);
+
+  // Ensure all 3 spans exist (sign may be missing in initial HTML).
+  let signSpan = node.querySelector(".sign");
+  let curSpan = node.querySelector(".currency");
+  let intSpan = node.querySelector(".int");
+  if (!intSpan || !curSpan) {
+    clear(node);
+    signSpan = el("span", { class: "sign" }, "−");
+    curSpan = el("span", { class: "currency" }, "₺");
+    intSpan = el("span", { class: "int" }, "0");
+    node.appendChild(signSpan);
+    node.appendChild(curSpan);
+    node.appendChild(intSpan);
+  } else if (!signSpan) {
+    signSpan = el("span", { class: "sign" }, "−");
+    node.insertBefore(signSpan, curSpan);
+  }
+  signSpan.style.display = isNeg ? "" : "none";
+
+  const prev = _amountState.get(node);
+  const from = prev ? prev.value : 0;
+  if (from === target) {
+    intSpan.textContent = Math.abs(target).toLocaleString("tr-TR");
+    _amountState.set(node, { value: target });
+    return;
+  }
+
+  // Skip animation if huge or reduced-motion
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const range = Math.abs(target - from);
+  if (reduced || range > 5_000_000) {
+    intSpan.textContent = Math.abs(target).toLocaleString("tr-TR");
+    _amountState.set(node, { value: target });
+    return;
+  }
+
+  // Cancel previous animation if any
+  if (prev?.raf) cancelAnimationFrame(prev.raf);
+
+  const dur = Math.min(800, 350 + range * 0.0006);
+  const start = performance.now();
+  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+  function tick(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const v = Math.round(from + (target - from) * easeOut(t));
+    intSpan.textContent = Math.abs(v).toLocaleString("tr-TR");
+    if (t < 1) {
+      const id = requestAnimationFrame(tick);
+      _amountState.set(node, { value: target, raf: id });
+    } else {
+      _amountState.set(node, { value: target });
+    }
+  }
+  const id = requestAnimationFrame(tick);
+  _amountState.set(node, { value: target, raf: id });
+}
+
+/* ==========================================================================
+   SPARKLINE
+   ========================================================================== */
+
+const _sparkCache = new WeakMap();
+function drawSparkline(rootEl, data) {
+  if (!rootEl) return;
+  const key = data ? data.map((d) => d.v).join(",") : "";
+  if (_sparkCache.get(rootEl) === key) return;
+  _sparkCache.set(rootEl, key);
+  const W = 440;
+  const H = 80;
+  const PAD_TOP = 12;
+  const PAD_BOTTOM = 8;
+
+  if (!data || !data.length) {
+    clear(rootEl);
+    return;
+  }
+
+  if (data.length === 1) {
+    // Single data point — render a soft pulsing dot
+    rootEl.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <circle class="line" cx="${W - 24}" cy="${H / 2}" r="3.5" fill="currentColor"/>
+      </svg>`;
+    return;
+  }
+
+  const values = data.map((d) => d.v);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 1);
+  const range = max - min || 1;
+
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const norm = (d.v - min) / range;
+    const y = H - PAD_BOTTOM - norm * (H - PAD_TOP - PAD_BOTTOM);
+    return [x, y];
+  });
+  const linePath = points
+    .map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`))
+    .join(" ");
+
+  rootEl.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <path class="line" d="${linePath}"/>
+    </svg>`;
+}
+
+/* ==========================================================================
+   DONUT CHART
+   ========================================================================== */
+
+function drawDonut(rootEl, segments, totalLabel) {
+  if (!rootEl) return;
+  const SIZE = 140;
+  const C = SIZE / 2;
+  const R = 56;
+  const STROKE = 14;
+  const CIRC = 2 * Math.PI * R;
+
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  let acc = 0;
+  const segHTML = segments
+    .map((s, i) => {
+      const len = (s.value / total) * CIRC;
+      const offset = -acc;
+      acc += len;
+      return `<circle class="seg" cx="${C}" cy="${C}" r="${R}"
+        stroke="${s.color}"
+        stroke-dasharray="${len} ${CIRC - len}"
+        stroke-dashoffset="${offset}"/>`;
+    })
+    .join("");
+
+  rootEl.innerHTML = `
+    <svg viewBox="0 0 ${SIZE} ${SIZE}" aria-hidden="true">
+      <circle class="track" cx="${C}" cy="${C}" r="${R}"/>
+      ${segHTML}
+    </svg>
+    <div class="donut-center">
+      <div class="label">Toplam</div>
+      <div class="value">${totalLabel}</div>
+    </div>`;
+}
+
+/* ==========================================================================
+   RENDER — CASH PAGE
+   ========================================================================== */
+
+function renderCash() {
+  const t = totalsOf(viewMonth);
+  setAmount($("#cash-amount"), t.balance);
+
+  // pills
+  const pills = $("#cash-pills");
+  clear(pills);
+  pills.appendChild(
+    el(
+      "span",
+      { class: "hero-pill gain" },
+      "+ ₺" + t.income.toLocaleString("tr-TR"),
+    ),
+  );
+  pills.appendChild(
+    el(
+      "span",
+      { class: "hero-pill neg" },
+      "− ₺" + t.expense.toLocaleString("tr-TR"),
+    ),
+  );
+
+  $("#month-label").textContent = fmt.monthLabel(viewMonth);
+
+  // sparkline = last 6 months balance
+  drawSparkline($("#cash-spark"), monthlyTrend(6, "balance"));
+
+  renderWealth();
+  renderExpenseChart(t.list);
+  renderTxList(t.list);
+}
+
+function renderWealth() {
+  const w = wealthBreakdown();
+  const wealthNode = $("#wealth-amount");
+  setAmount(wealthNode, w.total);
+  // wealth-amount uses different DOM than .hero-amount; sync neg class
+  wealthNode.classList.toggle("is-negative", w.total < 0);
+
+  // For the stack we visualize positives only; cash<0 ⇒ shown as warn segment.
+  const cashPos = Math.max(0, w.cash);
+  const cashNeg = Math.max(0, -w.cash);
+  const denom = Math.max(1, cashPos + cashNeg + w.pending + w.silver);
+  const stack = $("#wealth-stack");
+  // Slot 0 doubles as "negative cash" warning when w.cash < 0
+  stack.children[0].style.width =
+    ((cashNeg > 0 ? cashNeg : cashPos) / denom) * 100 + "%";
+  stack.children[0].classList.toggle("neg", cashNeg > 0);
+  stack.children[1].style.width = (w.pending / denom) * 100 + "%";
+  stack.children[2].style.width = (w.silver / denom) * 100 + "%";
+
+  const legend = $("#wealth-legend");
+  clear(legend);
+  const items = [
+    {
+      label: "Nakit",
+      value: w.cash,
+      color: w.cash < 0 ? "#E5364E" : "#00E08F",
+    },
+    { label: "Bekleyen", value: w.pending, color: "#FF7A45" },
+    { label: "Gümüş", value: w.silver, color: "#B8C0D2" },
+  ];
+  items.forEach((it) => {
+    const leg = el("div", { class: "leg" });
+    const top = el("div", { class: "top" });
+    top.appendChild(
+      el("span", { class: "dot", style: `background:${it.color}` }),
+    );
+    top.appendChild(el("span", {}, it.label));
+    leg.appendChild(top);
+    leg.appendChild(
+      el(
+        "div",
+        { class: `v${it.value < 0 ? " is-negative" : ""}` },
+        fmt.signed(it.value),
+      ),
+    );
+    legend.appendChild(leg);
+  });
+}
+
+function renderExpenseChart(list) {
+  const section = $("#expense-section");
+  const expenses = list.filter((t) => t.type === "expense");
+  if (!expenses.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  const byCat = new Map();
+  for (const t of expenses)
+    byCat.set(t.category, (byCat.get(t.category) || 0) + t.amount);
+  const total = [...byCat.values()].reduce((a, b) => a + b, 0);
+  const rows = [...byCat.entries()].sort((a, b) => b[1] - a[1]);
+
+  const segments = rows.map(([cat, amt], i) => ({
+    label: cat,
+    value: amt,
+    color: CHART_PALETTE[i % CHART_PALETTE.length],
+  }));
+
+  drawDonut($("#expense-donut"), segments, fmt.try(total));
+
+  const bars = $("#expense-bars");
+  clear(bars);
+  rows.forEach(([cat, amt], i) => {
+    const pct = (amt / total) * 100;
+    const color = CHART_PALETTE[i % CHART_PALETTE.length];
+    const item = el("div", { class: "bar-item" });
+    const name = el("div", { class: "name" });
+    name.appendChild(
+      el("span", { class: "dot", style: `background:${color}` }),
+    );
+    name.appendChild(el("span", {}, cat));
+    item.appendChild(name);
+    item.appendChild(
+      el("span", { class: "meta" }, `${fmt.try(amt)} · ${pct.toFixed(0)}%`),
+    );
+    const bar = el("div", { class: "bar" });
+    const fill = el("i", {
+      style: `background:${color};width:0%`,
+    });
+    bar.appendChild(fill);
+    item.appendChild(bar);
+    bars.appendChild(item);
+    requestAnimationFrame(() => {
+      fill.style.width = Math.max(2, pct) + "%";
+    });
+  });
+}
+
+function renderTxList(list) {
+  const root = $("#tx-list");
+  const prev = captureRects(root);
+  clear(root);
+
+  if (!list.length) {
+    root.appendChild(
+      emptyEl("inbox", "Bu ay hareket yok", "Sağ üstteki + ile ekleyin"),
+    );
+    hydrateIcons(root);
+    return;
+  }
+
+  const sorted = [...list].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id),
+  );
+  for (const t of sorted) {
+    const meta = categoryMeta(t.category);
+    const sign = t.type === "income" ? "+" : "−";
+    const sub = t.description
+      ? `${t.description} · ${fmt.date(t.date)}`
+      : fmt.date(t.date);
+    const row = el("button", {
+      class: "row tappable",
+      type: "button",
+      dataset: { id: t.id },
+      onclick: () => TxSheet.open(t.id),
+    });
+    row.appendChild(
+      el("span", { class: `row-icon ${meta.kind}`, "data-icon": meta.icon }),
+    );
+    const text = el("div", { class: "row-text" });
+    text.appendChild(el("div", { class: "row-title" }, t.category));
+    text.appendChild(el("div", { class: "row-sub" }, sub));
+    row.appendChild(text);
+    row.appendChild(
+      el(
+        "div",
+        {
+          class: `row-amount ${t.type === "income" ? "pos" : "neg"}`,
+        },
+        `${sign}${fmt.int(t.amount).replace(/^-/, "")} ₺`,
+      ),
+    );
+    root.appendChild(row);
+  }
+  hydrateIcons(root);
+  flipReorder(root, prev);
+}
+
+/* ==========================================================================
+   RENDER — PENDING PAGE
+   ========================================================================== */
+
+function renderPending() {
+  const list = Store.state.pending;
+  const total = list.reduce((s, p) => s + p.amount, 0);
+
+  setAmount($("#pending-amount"), total);
+
+  const pills = $("#pending-pills");
+  clear(pills);
+  if (list.length) {
+    pills.appendChild(
+      el("span", { class: "hero-pill" }, `${list.length} kayıt bekliyor`),
+    );
+    const aged = list.filter((p) => daysSince(p.createdAt) >= AGED_DAYS).length;
+    if (aged > 0)
+      pills.appendChild(
+        el("span", { class: "hero-pill neg" }, `${aged} eskidi`),
+      );
+  }
+
+  // sparkline of pending across months (cumulative)
+  drawSparkline($("#pending-spark"), monthlyTrend(6, "balance"));
+
+  const root = $("#pending-list");
+  const prev = captureRects(root);
+  clear(root);
+
+  if (!list.length) {
+    root.appendChild(
+      emptyEl(
+        "hourglass",
+        "Bekleyen tahsilat yok",
+        "Bekleyen ödemeleri sağ üstten ekleyin",
+      ),
+    );
+    hydrateIcons(root);
+    return;
+  }
+
+  const sorted = [...list].sort((a, b) => b.amount - a.amount);
+  for (const p of sorted) {
+    const aged = daysSince(p.createdAt) >= AGED_DAYS;
+    const etaText = p.exactDate
+      ? fmt.date(p.exactDate)
+      : ETA_LABELS[p.eta] || "Belirsiz";
+    const subParts = [etaText];
+    if (p.createdAt) subParts.push(`${daysSince(p.createdAt)} gün önce`);
+
+    const row = el("button", {
+      class: "row tappable",
+      type: "button",
+      dataset: { id: p.id },
+      onclick: (e) => {
+        if (e.target.closest("[data-collect]")) return;
+        PendingSheet.open(p.id);
+      },
+    });
+    row.appendChild(
+      el("span", { class: "row-icon pending", "data-icon": "hourglass" }),
+    );
+    const text = el("div", { class: "row-text" });
+    const titleLine = el("div", { class: "pending-title-line" });
+    titleLine.appendChild(el("div", { class: "row-title" }, p.source));
+    if (aged)
+      titleLine.appendChild(el("span", { class: "badge-warn" }, "eskidi"));
+    text.appendChild(titleLine);
+    text.appendChild(el("div", { class: "row-sub" }, subParts.join(" · ")));
+    row.appendChild(text);
+
+    const stack = el("div", { class: "row-stack" });
+    stack.appendChild(
+      el("div", { class: "row-amount bold" }, fmt.int(p.amount) + " ₺"),
+    );
+    stack.appendChild(
+      el(
+        "span",
+        {
+          class: "cta-chip",
+          "data-collect": "",
+          onclick: (e) => {
+            e.stopPropagation();
+            CollectSheet.open(p.id);
+          },
+        },
+        "Geldi · Aktar",
+      ),
+    );
+    row.appendChild(stack);
+
+    root.appendChild(row);
+  }
+  hydrateIcons(root);
+  flipReorder(root, prev);
+}
+
+/* ==========================================================================
+   RENDER — SILVER PAGE
+   ========================================================================== */
+
+function renderSilver() {
+  const gramPrice = Number(Store.state.settings.silverGramPrice) || 0;
+  const input = $("#silver-gram-price");
+  if (document.activeElement !== input) input.value = inputAmount(gramPrice);
+
+  let totalCost = 0,
+    totalValue = 0;
+  for (const p of Store.state.silver) {
+    const s = silverStats(p, gramPrice);
+    totalCost += s.cost;
+    totalValue += s.value;
+  }
+  const totalPl = totalValue - totalCost;
+  const totalPlPct = totalCost > 0 ? (totalPl / totalCost) * 100 : 0;
+
+  setAmount($("#silver-amount"), totalValue);
+
+  const pills = $("#silver-pills");
+  clear(pills);
+  if (Store.state.silver.length === 0) {
+    pills.appendChild(el("span", { class: "hero-pill" }, "Henüz pozisyon yok"));
+  } else {
+    const sign = totalPl >= 0 ? "+" : "−";
+    const cls = totalPl >= 0 ? "gain" : "neg";
+    pills.appendChild(
+      el(
+        "span",
+        { class: `hero-pill ${cls}` },
+        `${sign} ₺${fmt.int(Math.abs(totalPl))}`,
+      ),
+    );
+    pills.appendChild(
+      el("span", { class: `hero-pill ${cls}` }, fmt.pct(totalPlPct)),
+    );
+  }
+
+  drawSparkline($("#silver-spark"), monthlyTrend(6, "balance"));
+
+  renderSilverList(gramPrice);
+  renderPriceMeta();
+}
+
+function renderSilverList(gramPrice) {
+  const root = $("#silver-list");
+  clear(root);
+
+  if (!Store.state.silver.length) {
+    root.appendChild(
+      emptyEl(
+        "diamond",
+        "Pozisyon yok",
+        "Gram, ons veya fon pozisyonu ekleyin",
+      ),
+    );
+    hydrateIcons(root);
+    return;
+  }
+
+  for (const p of Store.state.silver) {
+    const s = silverStats(p, gramPrice);
+    const unit = SILVER_KIND_UNIT[p.kind];
+    const wrap = el("div", { class: "position" });
+
+    const head = el("div", { class: "position-head" });
+    head.appendChild(
+      el("span", {
+        class: `row-icon ${p.kind === "fund" ? "totals" : "gold"}`,
+        "data-icon": "diamond",
+      }),
+    );
+    const text = el("div", { class: "row-text" });
+    text.appendChild(
+      el(
+        "div",
+        { class: "position-title" },
+        `${fmt.num(p.amount)} ${unit} · ${SILVER_KIND_LABEL[p.kind]}`,
+      ),
+    );
+    text.appendChild(
+      el(
+        "div",
+        { class: "position-sub" },
+        `Maliyet ${fmt.try(s.cost)} · ${fmt.try(s.unitNow)}/${unit}`,
+      ),
+    );
+    head.appendChild(text);
+    const stack = el("div");
+    stack.appendChild(el("div", { class: "position-amt" }, fmt.try(s.value)));
+    stack.appendChild(
+      el(
+        "div",
+        { class: `position-pl ${s.pl >= 0 ? "pos" : "neg"}` },
+        fmt.pct(s.plPct),
+      ),
+    );
+    head.appendChild(stack);
+
+    head.addEventListener("click", () => SilverSheet.open(p.id));
+    wrap.appendChild(head);
+
+    if (p.targetPrice > 0) {
+      const buy = p.buyPrice;
+      const tgt = p.targetPrice;
+      const now = s.unitNow;
+      const span = Math.max(1, tgt - buy);
+      const ratio = Math.max(0, Math.min(1, (now - buy) / span));
+      const pct = Math.round(ratio * 100);
+
+      const numline = el("div", { class: "numline" });
+      const track = el("div", { class: "numline-track" });
+      const fill = el("div", {
+        class: "numline-fill",
+        style: `width:${pct}%`,
+      });
+      track.appendChild(fill);
+      track.appendChild(
+        el("div", { class: "numline-marker buy", style: "left:0%" }),
+      );
+      track.appendChild(
+        el("div", {
+          class: "numline-marker now",
+          style: `left:${Math.max(2, Math.min(98, pct))}%`,
+        }),
+      );
+      track.appendChild(
+        el("div", { class: "numline-marker target", style: "left:100%" }),
+      );
+      numline.appendChild(track);
+
+      const labels = el("div", { class: "numline-labels" });
+      labels.appendChild(buildCol("Alış", fmt.try(buy)));
+      const nowCol = buildCol("Şimdi", fmt.try(now));
+      nowCol.classList.add("now");
+      labels.appendChild(nowCol);
+      labels.appendChild(buildCol("Hedef", fmt.try(tgt)));
+      numline.appendChild(labels);
+
+      if (s.targetHit) {
+        numline.appendChild(
+          el("div", { class: "numline-target-hit" }, "✓ Hedefe ulaşıldı"),
+        );
+      }
+      wrap.appendChild(numline);
+    }
+    root.appendChild(wrap);
+  }
+  hydrateIcons(root);
+}
+
+function buildCol(label, value) {
+  const c = el("div", { class: "col" });
+  c.appendChild(el("div", { class: "lab" }, label));
+  c.appendChild(el("div", { class: "v" }, value));
+  return c;
+}
+
+function renderPriceMeta() {
+  const meta = $("#price-meta");
+  if (!meta) return;
+  if (Store.state.settings.priceFetchedAt) {
+    const d = new Date(Store.state.settings.priceFetchedAt);
+    meta.className = "price-hint";
+    meta.textContent = `Son çekim: ${fmt.date(
+      d.toISOString().slice(0, 10),
+    )} ${fmt.time(d)}`;
+  } else {
+    meta.className = "price-hint";
+    meta.textContent = "Otomatik çekim için Çek'e bas, ya da manuel gir.";
+  }
+}
+
+/* ==========================================================================
+   EMPTY STATE
+   ========================================================================== */
+
+/* FLIP — animate list reorder/insertion when items have stable id */
+function flipReorder(parent, prevRects) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!prevRects) return;
+  $$("[data-id]", parent).forEach((node) => {
+    const id = node.dataset.id;
+    const prev = prevRects.get(id);
+    if (!prev) {
+      // newly inserted — fade-in
+      node.animate(
+        [
+          { opacity: 0, transform: "translateY(6px) scale(0.98)" },
+          { opacity: 1, transform: "translateY(0) scale(1)" },
+        ],
+        { duration: 280, easing: "cubic-bezier(0.32,0.72,0,1)" },
+      );
+      return;
+    }
+    const next = node.getBoundingClientRect();
+    const dy = prev.top - next.top;
+    if (Math.abs(dy) < 1) return;
+    node.animate(
+      [{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }],
+      { duration: 320, easing: "cubic-bezier(0.32,0.72,0,1)" },
+    );
+  });
+}
+
+function captureRects(parent) {
+  const map = new Map();
+  $$("[data-id]", parent).forEach((node) => {
+    map.set(node.dataset.id, node.getBoundingClientRect());
+  });
+  return map;
+}
+
+function emptyEl(icon, title, sub) {
+  const node = el("div", { class: "empty" });
+  const ill = el("div", { class: "empty-illu" });
+  ill.appendChild(el("span", { "data-icon": icon }));
+  node.appendChild(ill);
+  node.appendChild(el("div", { class: "empty-title" }, title));
+  if (sub) node.appendChild(el("div", { class: "empty-sub" }, sub));
+  return node;
+}
+
+/* ==========================================================================
+   SEGMENTED THUMB POSITION
+   ========================================================================== */
+
+function setSegThumb(rootSelector, activeIndex) {
+  const root = $(rootSelector);
+  if (!root) return;
+  const thumb = root.querySelector(".seg-thumb");
+  if (!thumb) return;
+  thumb.style.transform = `translateX(${activeIndex * 100}%)`;
+}
+
+/* ==========================================================================
+   TX SHEET
+   ========================================================================== */
+
+const TxSheet = (() => {
+  let editingId = null;
+  let type = "expense";
+  let category = null;
+
+  function open(id = null) {
+    editingId = id;
+    if (id) {
+      const t = Store.state.transactions.find((x) => x.id === id);
+      if (!t) return;
+      type = t.type;
+      category = t.category;
+      $("#tx-title").textContent = "Hareket";
+      $("#tx-amount").value = inputAmount(t.amount);
+      $("#tx-desc").value = t.description || "";
+      $("#tx-date").value = t.date;
+      $("#tx-delete").hidden = false;
+    } else {
+      type = "expense";
+      category = Store.state.settings.lastUsedCategory?.[type] || null;
+      $("#tx-title").textContent = "Yeni Hareket";
+      $("#tx-amount").value = "";
+      $("#tx-desc").value = "";
+      $("#tx-date").value = todayISO();
+      $("#tx-delete").hidden = true;
+    }
+    renderSeg();
+    renderCats();
+    Sheets.open("sheet-tx", () =>
+      setTimeout(() => $("#tx-amount").focus(), 250),
+    );
+  }
+
+  function renderSeg() {
+    $$("[data-tx-type]", $("#sheet-tx")).forEach((b) => {
+      const on = b.dataset.txType === type;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    setSegThumb("#sheet-tx .seg", type === "expense" ? 0 : 1);
+  }
+
+  function renderCats() {
+    const grid = $("#tx-cat-grid");
+    clear(grid);
+    for (const c of Store.state.categories[type]) {
+      const isActive = c === category;
+      const chip = el(
+        "button",
+        {
+          type: "button",
+          class: `chip${isActive ? " active" : ""}`,
+          "aria-pressed": String(isActive),
+          onclick: () => {
+            category = c;
+            renderCats();
+          },
+        },
+        c,
+      );
+      grid.appendChild(chip);
+    }
+    grid.appendChild(
+      el(
+        "button",
+        {
+          type: "button",
+          class: "chip dashed",
+          onclick: async () => {
+            const name = await Prompt.show({
+              title: "Yeni Kategori",
+              label:
+                type === "income" ? "Gelir kategorisi" : "Gider kategorisi",
+              placeholder: "Örn. Ek gelir",
+            });
+            if (!name) return;
+            if (Store.state.categories[type].includes(name)) {
+              Toast.show("Bu kategori zaten var", "info");
+              return;
+            }
+            Store.update((s) => s.categories[type].push(name));
+            category = name;
+            renderCats();
+          },
+        },
+        "+ Yeni",
+      ),
+    );
+  }
+
+  function save() {
+    const amount = parseAmount($("#tx-amount").value);
+    if (!amount || amount <= 0) {
+      $("#tx-amount").focus();
+      Toast.show("Tutar gerekli", "error");
+      return;
+    }
+    if (!category) {
+      Toast.show("Lütfen bir kategori seçin", "error");
+      return;
+    }
+    const date = $("#tx-date").value || todayISO();
+    const description = $("#tx-desc").value.trim();
+    Store.update((s) => {
+      if (editingId) {
+        const t = s.transactions.find((x) => x.id === editingId);
+        if (t) Object.assign(t, { type, category, amount, description, date });
+      } else {
+        s.transactions.push({
+          id: uid(),
+          type,
+          category,
+          amount,
+          description,
+          date,
+        });
+      }
+      s.settings.lastUsedCategory = s.settings.lastUsedCategory || {};
+      s.settings.lastUsedCategory[type] = category;
+    });
+    Sheets.close("sheet-tx");
+  }
+
+  async function remove() {
+    if (!editingId) return;
+    const ok = await Confirm.show({
+      title: "Hareket silinsin mi?",
+      message: "Bu işlem geri alınamaz.",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      s.transactions = s.transactions.filter((t) => t.id !== editingId);
+    });
+    Sheets.close("sheet-tx");
+    Toast.show("Hareket silindi", "success");
+  }
+
+  function bind() {
+    $("#tx-save").addEventListener("click", save);
+    $("#tx-delete").addEventListener("click", remove);
+    $$("[data-tx-type]", $("#sheet-tx")).forEach((b) => {
+      b.addEventListener("click", () => {
+        type = b.dataset.txType;
+        category = Store.state.settings.lastUsedCategory?.[type] || null;
+        renderSeg();
+        renderCats();
+      });
+    });
+  }
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   PENDING SHEET
+   ========================================================================== */
+
+const PendingSheet = (() => {
+  let editingId = null;
+  let eta = "unknown";
+
+  function open(id = null) {
+    editingId = id;
+    if (id) {
+      const p = Store.state.pending.find((x) => x.id === id);
+      if (!p) return;
+      eta = p.eta || "unknown";
+      $("#pending-title").textContent = "Bekleyen";
+      $("#pending-source").value = p.source;
+      $("#pending-amount-in").value = inputAmount(p.amount);
+      $("#pending-date").value = p.exactDate || "";
+      $("#pending-delete").hidden = false;
+    } else {
+      eta = "unknown";
+      $("#pending-title").textContent = "Yeni Bekleyen";
+      $("#pending-source").value = "";
+      $("#pending-amount-in").value = "";
+      $("#pending-date").value = "";
+      $("#pending-delete").hidden = true;
+    }
+    renderEta();
+    Sheets.open("sheet-pending", () =>
+      setTimeout(() => $("#pending-source").focus(), 250),
+    );
+  }
+
+  function renderEta() {
+    const grid = $("#eta-grid");
+    clear(grid);
+    for (const o of ETA_OPTIONS) {
+      const isActive = o.key === eta;
+      const chip = el(
+        "button",
+        {
+          type: "button",
+          class: `chip${isActive ? " active" : ""}`,
+          "aria-pressed": String(isActive),
+          onclick: () => {
+            eta = o.key;
+            renderEta();
+          },
+        },
+        o.label,
+      );
+      grid.appendChild(chip);
+    }
+  }
+
+  function save() {
+    const source = $("#pending-source").value.trim();
+    const amount = parseAmount($("#pending-amount-in").value);
+    const exactDate = $("#pending-date").value || null;
+    if (!source) {
+      $("#pending-source").focus();
+      return;
+    }
+    if (!amount || amount <= 0) {
+      $("#pending-amount-in").focus();
+      return;
+    }
+    Store.update((s) => {
+      if (editingId) {
+        const p = s.pending.find((x) => x.id === editingId);
+        if (p) Object.assign(p, { source, amount, eta, exactDate });
+      } else {
+        s.pending.push({
+          id: uid(),
+          source,
+          amount,
+          eta,
+          exactDate,
+          createdAt: todayISO(),
+        });
+      }
+    });
+    Sheets.close("sheet-pending");
+  }
+
+  async function remove() {
+    if (!editingId) return;
+    const ok = await Confirm.show({
+      title: "Bekleyen kayıt silinsin mi?",
+      message: "Bu işlem geri alınamaz.",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      s.pending = s.pending.filter((p) => p.id !== editingId);
+    });
+    Sheets.close("sheet-pending");
+    Toast.show("Bekleyen silindi", "success");
+  }
+
+  function bind() {
+    $("#pending-save").addEventListener("click", save);
+    $("#pending-delete").addEventListener("click", remove);
+  }
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   COLLECT SHEET
+   ========================================================================== */
+
+const CollectSheet = (() => {
+  let pendingId = null;
+  let category = null;
+
+  function open(id) {
+    const p = Store.state.pending.find((x) => x.id === id);
+    if (!p) return;
+    pendingId = id;
+    category =
+      Store.state.settings.lastUsedCategory?.income ||
+      Store.state.categories.income[0] ||
+      null;
+
+    $("#collect-source").textContent = p.source;
+    $("#collect-pre-amount").textContent = "₺" + fmt.int(p.amount);
+    $("#collect-amount").value = inputAmount(p.amount);
+    $("#collect-date").value = todayISO();
+    renderCats();
+    Sheets.open("sheet-collect");
+  }
+
+  function renderCats() {
+    const grid = $("#collect-cat-grid");
+    clear(grid);
+    for (const c of Store.state.categories.income) {
+      const isActive = c === category;
+      const chip = el(
+        "button",
+        {
+          type: "button",
+          class: `chip${isActive ? " active" : ""}`,
+          "aria-pressed": String(isActive),
+          onclick: () => {
+            category = c;
+            renderCats();
+          },
+        },
+        c,
+      );
+      grid.appendChild(chip);
+    }
+    grid.appendChild(
+      el(
+        "button",
+        {
+          type: "button",
+          class: "chip dashed",
+          onclick: async () => {
+            const name = await Prompt.show({
+              title: "Yeni Gelir Kategorisi",
+              label: "Kategori adı",
+              placeholder: "Örn. Ek gelir",
+            });
+            if (!name) return;
+            if (Store.state.categories.income.includes(name)) {
+              Toast.show("Bu kategori zaten var", "info");
+              return;
+            }
+            Store.update((s) => s.categories.income.push(name));
+            category = name;
+            renderCats();
+          },
+        },
+        "+ Yeni",
+      ),
+    );
+  }
+
+  function save() {
+    if (!pendingId) return;
+    const p = Store.state.pending.find((x) => x.id === pendingId);
+    if (!p) return;
+    const amount = parseAmount($("#collect-amount").value);
+    if (!amount || amount <= 0) {
+      $("#collect-amount").focus();
+      Toast.show("Tutar gerekli", "error");
+      return;
+    }
+    if (!category) {
+      Toast.show("Lütfen bir kategori seçin", "error");
+      return;
+    }
+    const date = $("#collect-date").value || todayISO();
+    Store.update((s) => {
+      s.transactions.push({
+        id: uid(),
+        type: "income",
+        category,
+        description: p.source,
+        amount,
+        date,
+      });
+      s.pending = s.pending.filter((x) => x.id !== pendingId);
+      s.settings.lastUsedCategory = s.settings.lastUsedCategory || {};
+      s.settings.lastUsedCategory.income = category;
+    });
+    Sheets.close("sheet-collect");
+  }
+
+  function bind() {
+    $("#collect-save").addEventListener("click", save);
+  }
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   SILVER SHEET
+   ========================================================================== */
+
+const SilverSheet = (() => {
+  let editingId = null;
+  let kind = "gram";
+
+  function open(id = null) {
+    editingId = id;
+    if (id) {
+      const p = Store.state.silver.find((x) => x.id === id);
+      if (!p) return;
+      kind = p.kind;
+      $("#silver-title").textContent = "Pozisyon";
+      $("#silver-amount-in").value = inputAmount(p.amount);
+      $("#silver-buy-price").value = inputAmount(p.buyPrice);
+      $("#silver-buy-date").value = p.buyDate || "";
+      $("#silver-current-price").value = inputAmount(p.currentPrice);
+      $("#silver-target").value = inputAmount(p.targetPrice);
+      $("#silver-delete").hidden = false;
+    } else {
+      kind = "gram";
+      $("#silver-title").textContent = "Yeni Pozisyon";
+      $("#silver-amount-in").value = "";
+      $("#silver-buy-price").value = "";
+      $("#silver-buy-date").value = "";
+      $("#silver-current-price").value = "";
+      $("#silver-target").value = "";
+      $("#silver-delete").hidden = true;
+    }
+    renderSeg();
+    Sheets.open("sheet-silver", () =>
+      setTimeout(() => $("#silver-amount-in").focus(), 250),
+    );
+  }
+
+  function renderSeg() {
+    $$("[data-silver-kind]", $("#sheet-silver")).forEach((b) => {
+      const on = b.dataset.silverKind === kind;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    const idx = ["gram", "ounce", "fund"].indexOf(kind);
+    setSegThumb("#sheet-silver .seg", idx);
+
+    const unit = SILVER_KIND_UNIT[kind];
+    $("#silver-amt-label").textContent = `Miktar (${unit})`;
+    $("#silver-buy-label").textContent = `Alış Birim Fiyatı (₺/${unit})`;
+    $("#silver-target-label").textContent =
+      `Hedef Satış Fiyatı (₺/${unit}, opsiyonel)`;
+    const isFund = kind === "fund";
+    $("#silver-current-field").hidden = !isFund;
+    $("#silver-current-label").textContent = `Güncel Birim Fiyatı (₺/${unit})`;
+  }
+
+  function save() {
+    const amount = parseAmount($("#silver-amount-in").value);
+    const buyPrice = parseAmount($("#silver-buy-price").value);
+    const buyDate = $("#silver-buy-date").value || null;
+    const currentPrice = parseAmount($("#silver-current-price").value);
+    const targetPrice = parseAmount($("#silver-target").value);
+
+    if (!amount || amount <= 0) {
+      $("#silver-amount-in").focus();
+      return;
+    }
+    if (!buyPrice || buyPrice <= 0) {
+      $("#silver-buy-price").focus();
+      return;
+    }
+    if (kind === "fund" && (!currentPrice || currentPrice <= 0)) {
+      Toast.show("Fon pozisyonu için güncel birim fiyatı gerekli", "error");
+      $("#silver-current-price").focus();
+      return;
+    }
+    const data = {
+      kind,
+      amount,
+      buyPrice,
+      buyDate,
+      currentPrice: currentPrice > 0 ? currentPrice : null,
+      targetPrice: targetPrice > 0 ? targetPrice : null,
+    };
+    Store.update((s) => {
+      if (editingId) {
+        const p = s.silver.find((x) => x.id === editingId);
+        if (p) Object.assign(p, data);
+      } else {
+        s.silver.push({ id: uid(), ...data });
+      }
+    });
+    Sheets.close("sheet-silver");
+  }
+
+  async function remove() {
+    if (!editingId) return;
+    const ok = await Confirm.show({
+      title: "Pozisyon silinsin mi?",
+      message: "Bu işlem geri alınamaz.",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      s.silver = s.silver.filter((p) => p.id !== editingId);
+    });
+    Sheets.close("sheet-silver");
+    Toast.show("Pozisyon silindi", "success");
+  }
+
+  function bind() {
+    $("#silver-save").addEventListener("click", save);
+    $("#silver-delete").addEventListener("click", remove);
+    $$("[data-silver-kind]", $("#sheet-silver")).forEach((b) => {
+      b.addEventListener("click", () => {
+        kind = b.dataset.silverKind;
+        renderSeg();
+      });
+    });
+  }
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   GRAM PRICE
+   ========================================================================== */
+
+function onGramPriceInput() {
+  const v = parseAmount($("#silver-gram-price").value);
+  Store.update((s) => {
+    s.settings.silverGramPrice = v > 0 ? v : null;
+  });
+}
+
+function pickSilverGramPrice(data) {
+  if (!data || typeof data !== "object") return null;
+  const candidates = [
+    data["gumus"],
+    data["GUMUS"],
+    data["Gümüş"],
+    data["Gumus"],
+    data["GA"],
+    data["silver"],
+  ].filter(Boolean);
+  for (const c of candidates) {
+    const sell = c.Selling ?? c.selling ?? c.satis ?? c.Satış ?? c.Satis;
+    const buy = c.Buying ?? c.buying ?? c.alis ?? c.Alış ?? c.Alis;
+    const v = parseAmount(String(sell ?? buy ?? ""));
+    if (v > 0) return v;
+  }
+  return null;
+}
+
+async function fetchSilverPrice() {
+  const meta = $("#price-meta");
+  const btn = $("#fetch-price-btn");
+  meta.className = "price-hint";
+  meta.textContent = "Çekiliyor...";
+  btn.disabled = true;
+
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+
+  try {
+    const res = await fetch(PRICE_ENDPOINT, {
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const price = pickSilverGramPrice(data);
+    if (!price) throw new Error("Fiyat bulunamadı");
+    Store.update((s) => {
+      s.settings.silverGramPrice = price;
+      s.settings.priceFetchedAt = new Date().toISOString();
+    });
+    Toast.show("Gümüş fiyatı güncellendi", "success");
+  } catch (err) {
+    meta.className = "price-hint error";
+    if (err.name === "AbortError") {
+      meta.textContent = "Zaman aşımı. Bağlantını kontrol edip tekrar dene.";
+    } else {
+      meta.textContent = `Çekilemedi: ${err.message}. Manuel girebilirsin.`;
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    btn.disabled = false;
+  }
+}
+
+/* ==========================================================================
+   MONTH PICKER
+   ========================================================================== */
+
+const MonthPicker = (() => {
+  function open() {
+    pickerYear = Number(viewMonth.split("-")[0]);
+    render();
+    Sheets.open("sheet-month");
+  }
+  function render() {
+    $("#year-label").textContent = String(pickerYear);
+    const now = new Date();
+    const cy = now.getFullYear();
+    const cm = now.getMonth() + 1;
+    const txMonths = new Set(
+      Store.state.transactions.map((t) => monthKeyOf(t.date)),
+    );
+    const grid = $("#month-grid");
+    clear(grid);
+    for (let i = 0; i < 12; i++) {
+      const m = i + 1;
+      const key = `${pickerYear}-${String(m).padStart(2, "0")}`;
+      const cell = el(
+        "button",
+        {
+          type: "button",
+          class: [
+            "month-cell",
+            key === viewMonth ? "active" : "",
+            txMonths.has(key) ? "has" : "",
+            pickerYear > cy || (pickerYear === cy && m > cm) ? "empty" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          onclick: () => {
+            viewMonth = key;
+            Sheets.close("sheet-month");
+            renderCash();
+          },
+        },
+        TR_MONTHS_SHORT[i],
+      );
+      grid.appendChild(cell);
+    }
+    renderHistory();
+  }
+  function renderHistory() {
+    const root = $("#month-history");
+    clear(root);
+    const byMonth = new Map();
+    for (const t of Store.state.transactions) {
+      const k = monthKeyOf(t.date);
+      if (!byMonth.has(k)) byMonth.set(k, { income: 0, expense: 0 });
+      const b = byMonth.get(k);
+      if (t.type === "income") b.income += t.amount;
+      else b.expense += t.amount;
+    }
+    const keys = [...byMonth.keys()].sort().reverse().slice(0, 6);
+    if (!keys.length) {
+      root.appendChild(
+        emptyEl("inbox", "Henüz veri yok", "İlk hareketini ekle"),
+      );
+      hydrateIcons(root);
+      return;
+    }
+    for (const k of keys) {
+      const b = byMonth.get(k);
+      const bal = b.income - b.expense;
+      const row = el("button", {
+        class: "row tappable",
+        type: "button",
+        onclick: () => {
+          viewMonth = k;
+          Sheets.close("sheet-month");
+          renderCash();
+        },
+      });
+      row.appendChild(
+        el("span", { class: "row-icon totals", "data-icon": "trend" }),
+      );
+      const text = el("div", { class: "row-text" });
+      text.appendChild(el("div", { class: "row-title" }, fmt.monthLabel(k)));
+      text.appendChild(
+        el(
+          "div",
+          { class: "row-sub" },
+          `+${fmt.try(b.income)} · −${fmt.try(b.expense)}`,
+        ),
+      );
+      row.appendChild(text);
+      row.appendChild(
+        el(
+          "div",
+          {
+            class: `row-amount ${bal >= 0 ? "pos" : "neg"} bold`,
+          },
+          fmt.signed(bal),
+        ),
+      );
+      root.appendChild(row);
+    }
+    hydrateIcons(root);
+  }
+  function bind() {
+    $("#year-prev").addEventListener("click", () => {
+      pickerYear--;
+      render();
+    });
+    $("#year-next").addEventListener("click", () => {
+      pickerYear++;
+      render();
+    });
+    $("#month-today").addEventListener("click", () => {
+      viewMonth = currentMonthKey();
+      Sheets.close("sheet-month");
+      renderCash();
+    });
+  }
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   SETTINGS
+   ========================================================================== */
+
+const Settings = (() => {
+  function open() {
+    const sub = $("#export-sub");
+    sub.textContent = Store.state.settings.lastBackup
+      ? `Son yedek: ${fmt.date(Store.state.settings.lastBackup)}`
+      : "Tüm verilerin tek dosyada";
+    const meta = $("#settings-meta");
+    const s = Store.state;
+    meta.textContent = `Bütçe v1 · ${s.transactions.length} hareket · ${s.pending.length} bekleyen · ${s.silver.length} pozisyon`;
+    Theme.syncThumb();
+    Sheets.open("sheet-settings");
+  }
+  function exportData() {
+    const payload = {
+      app: "ggai",
+      version: STATE_VERSION,
+      exportedAt: new Date().toISOString(),
+      state: Store.state,
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const today = todayISO();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `butce-yedek-${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Store.update((s) => {
+      s.settings.lastBackup = today;
+    });
+    $("#export-sub").textContent = `Son yedek: ${fmt.date(today)}`;
+  }
+  function importData(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(String(e.target.result));
+        const incoming = data?.state || data;
+        if (!incoming || typeof incoming !== "object") throw new Error();
+        if (!Array.isArray(incoming.transactions)) throw new Error();
+
+        const ok = await Confirm.show({
+          title: "Yedeği yüklemek istiyor musun?",
+          message: "Mevcut tüm verinin üzerine yazılacak.",
+          confirmLabel: "Yükle",
+          danger: true,
+        });
+        if (!ok) return;
+
+        Store.replace({
+          transactions: incoming.transactions || [],
+          pending: incoming.pending || [],
+          silver: incoming.silver || [],
+          categories: {
+            income: incoming.categories?.income || [
+              ...DEFAULT_CATEGORIES.income,
+            ],
+            expense: incoming.categories?.expense || [
+              ...DEFAULT_CATEGORIES.expense,
+            ],
+          },
+          settings: incoming.settings || {},
+        });
+        Sheets.close("sheet-settings");
+        Toast.show("Yedek yüklendi", "success");
+      } catch {
+        Toast.show("Geçersiz yedek dosyası", "error");
+      } finally {
+        $("#import-file").value = "";
+      }
+    };
+    reader.readAsText(file);
+  }
+  async function reset() {
+    const ok1 = await Confirm.show({
+      title: "Tüm veriyi silmek istiyor musun?",
+      message: "Önce yedek almanı öneririm. Bu işlem geri alınamaz.",
+      confirmLabel: "Devam et",
+      danger: true,
+    });
+    if (!ok1) return;
+    const ok2 = await Confirm.show({
+      title: "Son onay",
+      message: "Tüm hareketler, bekleyenler ve pozisyonlar silinecek.",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok2) return;
+    Store.reset();
+    Sheets.close("sheet-settings");
+    Toast.show("Tüm veri silindi", "info");
+  }
+  function bind() {
+    $("#open-settings").addEventListener("click", open);
+    $("#export-btn").addEventListener("click", exportData);
+    $("#import-btn").addEventListener("click", () => $("#import-file").click());
+    $("#import-file").addEventListener("change", (e) =>
+      importData(e.target.files[0]),
+    );
+    $("#reset-btn").addEventListener("click", reset);
+    $$("[data-theme-opt]").forEach((b) => {
+      b.addEventListener("click", () => Theme.apply(b.dataset.themeOpt));
+    });
+  }
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   GLOBAL RENDER
+   ========================================================================== */
+
+function renderAll() {
+  // Only render the visible page; the others re-render on tab switch.
+  if (activeTab === "cash") renderCash();
+  else if (activeTab === "pending") renderPending();
+  else if (activeTab === "silver") renderSilver();
+}
+
+/* ==========================================================================
+   SERVICE WORKER
+   ========================================================================== */
+
+function registerSW() {
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("service-worker.js")
+      .then((reg) => {
+        // If a waiting worker already exists when we register, prompt now.
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          showUpdatePrompt(reg.waiting);
+        }
+        reg.addEventListener("updatefound", () => {
+          const installing = reg.installing;
+          if (!installing) return;
+          installing.addEventListener("statechange", () => {
+            if (
+              installing.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              showUpdatePrompt(installing);
+            }
+          });
+        });
+      })
+      .catch(() => {});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  });
+}
+
+function showUpdatePrompt(worker) {
+  // Lightweight inline toast with action — wraps Toast.show but stays until clicked
+  const host = $("#toast-host");
+  if (!host) return;
+  const node = el("div", { class: "toast info update-toast" });
+  const msg = el("span", {}, "Yeni sürüm hazır");
+  const btn = el(
+    "button",
+    {
+      class: "toast-action",
+      type: "button",
+      onclick: () => {
+        worker.postMessage("SKIP_WAITING");
+      },
+    },
+    "Yenile",
+  );
+  node.appendChild(msg);
+  node.appendChild(btn);
+  host.appendChild(node);
+  requestAnimationFrame(() => node.classList.add("show"));
+}
+
+function bindOnlineStatus() {
+  const indicator = el("span", {
+    class: "online-dot",
+    "aria-hidden": "true",
+  });
+  const topbar = $(".topbar");
+  if (topbar) topbar.appendChild(indicator);
+  const update = () => {
+    indicator.classList.toggle("offline", !navigator.onLine);
+    indicator.title = navigator.onLine ? "Çevrimiçi" : "Çevrimdışı";
+  };
+  window.addEventListener("online", () => {
+    update();
+    Toast.show("Çevrimiçi", "success", { duration: 1400 });
+  });
+  window.addEventListener("offline", () => {
+    update();
+    Toast.show("Çevrimdışı — değişiklikler yerel kaydedilir", "info", {
+      duration: 2400,
+    });
+  });
+  update();
+}
+
+/* ==========================================================================
+   INIT
+   ========================================================================== */
+
+function bindPrivacyToggle() {
+  const btn = $("#privacy-toggle");
+  if (btn) btn.addEventListener("click", () => Privacy.toggle());
+  // Long-press hero amount → toggle privacy quickly
+  $$(".hero-amount").forEach((el) => {
+    let t = 0;
+    el.addEventListener("pointerdown", () => {
+      t = setTimeout(() => Privacy.toggle(), 600);
+    });
+    const cancel = () => clearTimeout(t);
+    el.addEventListener("pointerup", cancel);
+    el.addEventListener("pointerleave", cancel);
+    el.addEventListener("pointercancel", cancel);
+  });
+}
+
+function bindHeroTilt() {
+  // Mouse-only — touch already has drag/scroll; devicemotion would need permission flow.
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!matchMedia("(hover: hover)").matches) return;
+  $$(".hero").forEach((hero) => {
+    let raf = 0;
+    const reset = () => {
+      hero.classList.remove("tilting");
+      hero.style.transform = "";
+    };
+    hero.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "mouse") return;
+      const r = hero.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      // Map [0..1] to [-1..1], scale by max tilt (4 deg)
+      const ry = (px - 0.5) * 8;
+      const rx = -(py - 0.5) * 6;
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        hero.classList.add("tilting");
+        hero.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(2px)`;
+      });
+    });
+    hero.addEventListener("pointerleave", reset);
+    hero.addEventListener("pointercancel", reset);
+  });
+}
+
+function bindTopbarScrollBlur() {
+  const scroll = $("#scroll-root");
+  const topbar = $(".topbar");
+  if (!scroll || !topbar) return;
+  let raf = 0;
+  const update = () => {
+    topbar.classList.toggle("scrolled", scroll.scrollTop > 4);
+    raf = 0;
+  };
+  scroll.addEventListener(
+    "scroll",
+    () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    },
+    { passive: true },
+  );
+  // also listen on window since iOS Safari uses window scroll for the page
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (!raf)
+        raf = requestAnimationFrame(() => {
+          topbar.classList.toggle(
+            "scrolled",
+            (window.scrollY || scroll.scrollTop) > 4,
+          );
+          raf = 0;
+        });
+    },
+    { passive: true },
+  );
+}
+
+function init() {
+  Theme.init();
+  Privacy.init();
+  hydrateIcons();
+  bindTopbarScrollBlur();
+  bindHeroTilt();
+  bindPrivacyToggle();
+
+  // Header add button — opens sheet for active tab
+  $("#header-add").addEventListener("click", () => {
+    if (activeTab === "cash") TxSheet.open();
+    else if (activeTab === "pending") PendingSheet.open();
+    else if (activeTab === "silver") SilverSheet.open();
+  });
+
+  $("#month-pill").addEventListener("click", () => MonthPicker.open());
+
+  $$(".tab").forEach((b) =>
+    b.addEventListener("click", () => switchTab(b.dataset.target)),
+  );
+
+  $("#silver-gram-price").addEventListener("input", onGramPriceInput);
+  $("#fetch-price-btn").addEventListener("click", fetchSilverPrice);
+
+  TxSheet.bind();
+  PendingSheet.bind();
+  CollectSheet.bind();
+  SilverSheet.bind();
+  MonthPicker.bind();
+  Settings.bind();
+  Confirm.bind();
+  Prompt.bind();
+  DatePicker.bind();
+
+  // Wrap native date inputs with custom pill
+  ["#tx-date", "#pending-date", "#collect-date", "#silver-buy-date"].forEach(
+    (sel) => attachDatePill($(sel)),
+  );
+
+  Store.subscribe(renderAll);
+  switchTab("cash");
+  bindOnlineStatus();
+  registerSW();
+}
+
+init();
