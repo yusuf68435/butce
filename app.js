@@ -187,8 +187,19 @@ const I18N = {
     "settings.notifOff": "Limit aşıldığında sistem bildirimi gönder",
     "settings.notifOn": "Bildirimler aktif",
     "settings.notifDenied": "İzin reddedildi — tarayıcı ayarından açabilirsin",
+    "settings.recurring": "Tekrarlayan İşlemler",
+    "settings.recurringSub": "Her ay otomatik kira/maaş/fatura",
     "notif.budgetTitle": "Bütçe Limiti Aşıldı",
     "notif.budgetOver": "limiti aştı",
+    "title.newRecurring": "Yeni Tekrarlayan",
+    "title.recurring": "Tekrarlayan İşlemler",
+    "field.dayOfMonth": "Ayın Günü",
+    "label.everyMonth": "her ayın",
+    "label.dayOfMonth": ".günü",
+    "empty.recurring.title": "Tekrarlayan kural yok",
+    "empty.recurring.sub": 'Sağ üstteki "Yeni" ile ekle',
+    "toast.recurringApplied": "tekrarlayan işlem uygulandı",
+    "toast.recurringDeleted": "Kural silindi",
     "toast.deleted": "Silindi",
     "toast.txDeleted": "Hareket silindi",
     "toast.pendingDeleted": "Bekleyen silindi",
@@ -305,8 +316,19 @@ const I18N = {
     "settings.notifOff": "Send a system notification when limit exceeded",
     "settings.notifOn": "Notifications enabled",
     "settings.notifDenied": "Permission denied — enable from browser settings",
+    "settings.recurring": "Recurring Transactions",
+    "settings.recurringSub": "Auto-add rent/salary/bills every month",
     "notif.budgetTitle": "Budget Limit Exceeded",
     "notif.budgetOver": "over limit",
+    "title.newRecurring": "New Recurring",
+    "title.recurring": "Recurring Transactions",
+    "field.dayOfMonth": "Day of month",
+    "label.everyMonth": "every",
+    "label.dayOfMonth": "th",
+    "empty.recurring.title": "No recurring rules",
+    "empty.recurring.sub": 'Tap "New" at the top right',
+    "toast.recurringApplied": "recurring transactions applied",
+    "toast.recurringDeleted": "Rule deleted",
     "toast.deleted": "Deleted",
     "toast.txDeleted": "Transaction deleted",
     "toast.pendingDeleted": "Pending deleted",
@@ -432,6 +454,8 @@ const ICONS = {
   globe:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+  repeat:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m17 1 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
 };
 
 function hydrateIcons(root = document) {
@@ -695,6 +719,209 @@ const Haptics = {
     if (navigator.vibrate) navigator.vibrate([20, 60, 20]);
   },
 };
+
+/* ==========================================================================
+   RECURRING transactions — monthly auto-apply rules
+   ========================================================================== */
+
+const Recurring = (() => {
+  let editingId = null;
+  let editType = "expense";
+  let editCategory = null;
+
+  function open() {
+    renderList();
+    Sheets.open("sheet-recurring");
+  }
+
+  function renderList() {
+    const root = $("#recurring-list");
+    if (!root) return;
+    clear(root);
+    const rules = Store.state.recurring || [];
+    if (!rules.length) {
+      root.appendChild(
+        emptyEl("repeat", t("empty.recurring.title"), t("empty.recurring.sub")),
+      );
+      hydrateIcons(root);
+      return;
+    }
+    rules
+      .slice()
+      .sort((a, b) => a.dayOfMonth - b.dayOfMonth)
+      .forEach((r) => {
+        const meta = categoryMeta(r.category);
+        const sign = r.type === "income" ? "+" : "−";
+        const sub =
+          (r.description ? r.description + " · " : "") +
+          `${t("label.everyMonth")} ${r.dayOfMonth}${t("label.dayOfMonth")}`;
+        const row = el("button", {
+          class: "row tappable",
+          type: "button",
+          onclick: () => openEdit(r.id),
+        });
+        row.appendChild(
+          el("span", {
+            class: `row-icon ${meta.kind}`,
+            "data-icon": meta.icon,
+          }),
+        );
+        const text = el("div", { class: "row-text" });
+        text.appendChild(el("div", { class: "row-title" }, r.category));
+        text.appendChild(el("div", { class: "row-sub" }, sub));
+        row.appendChild(text);
+        row.appendChild(
+          el(
+            "div",
+            { class: `row-amount ${r.type === "income" ? "pos" : "neg"}` },
+            `${sign}${fmt.int(r.amount)} ₺`,
+          ),
+        );
+        root.appendChild(row);
+      });
+    hydrateIcons(root);
+  }
+
+  function openEdit(id) {
+    editingId = id;
+    if (id) {
+      const r = Store.state.recurring.find((x) => x.id === id);
+      if (!r) return;
+      editType = r.type;
+      editCategory = r.category;
+      $("#rec-edit-title").textContent = t("settings.recurring");
+      $("#rec-amount").value = inputAmount(r.amount);
+      $("#rec-desc").value = r.description || "";
+      $("#rec-day").value = r.dayOfMonth || 1;
+      $("#rec-delete").hidden = false;
+    } else {
+      editType = "expense";
+      editCategory = null;
+      $("#rec-edit-title").textContent = t("title.newRecurring");
+      $("#rec-amount").value = "";
+      $("#rec-desc").value = "";
+      $("#rec-day").value = 1;
+      $("#rec-delete").hidden = true;
+    }
+    renderSeg();
+    renderCats();
+    Sheets.open("sheet-recurring-edit", () =>
+      setTimeout(() => $("#rec-amount").focus(), 250),
+    );
+  }
+
+  function renderSeg() {
+    $$("[data-rec-type]", $("#sheet-recurring-edit")).forEach((b) => {
+      const on = b.dataset.recType === editType;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    setSegThumb("#sheet-recurring-edit .seg", editType === "expense" ? 0 : 1);
+  }
+
+  function renderCats() {
+    const grid = $("#rec-cat-grid");
+    clear(grid);
+    for (const c of Store.state.categories[editType]) {
+      const isActive = c === editCategory;
+      const chip = el(
+        "button",
+        {
+          type: "button",
+          class: `chip${isActive ? " active" : ""}`,
+          "aria-pressed": String(isActive),
+          onclick: () => {
+            editCategory = c;
+            renderCats();
+          },
+        },
+        c,
+      );
+      grid.appendChild(chip);
+    }
+  }
+
+  function save() {
+    const amount = parseAmount($("#rec-amount").value);
+    if (!amount || amount <= 0) {
+      $("#rec-amount").focus();
+      Toast.show(t("toast.amountRequired"), "error");
+      return;
+    }
+    if (!editCategory) {
+      Toast.show(t("toast.categoryRequired"), "error");
+      return;
+    }
+    const dayOfMonth = Math.max(
+      1,
+      Math.min(28, Number($("#rec-day").value) || 1),
+    );
+    const description = $("#rec-desc").value.trim();
+    Store.update((s) => {
+      s.recurring = s.recurring || [];
+      if (editingId) {
+        const r = s.recurring.find((x) => x.id === editingId);
+        if (r) {
+          Object.assign(r, {
+            type: editType,
+            category: editCategory,
+            amount,
+            description,
+            dayOfMonth,
+          });
+        }
+      } else {
+        s.recurring.push({
+          id: uid(),
+          type: editType,
+          category: editCategory,
+          amount,
+          description,
+          dayOfMonth,
+          lastApplied: null,
+        });
+      }
+    });
+    Sheets.close("sheet-recurring-edit");
+    renderList();
+  }
+
+  async function remove() {
+    if (!editingId) return;
+    const ok = await Confirm.show({
+      title: "Bu kuralı silmek istiyor musun?",
+      message: "Eklenmiş geçmiş hareketler silinmez.",
+      confirmLabel: t("btn.delete"),
+      danger: true,
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      s.recurring = s.recurring.filter((r) => r.id !== editingId);
+    });
+    Sheets.close("sheet-recurring-edit");
+    Toast.show(t("toast.recurringDeleted"), "success");
+    renderList();
+  }
+
+  function bind() {
+    const openBtn = $("#open-recurring");
+    if (openBtn) openBtn.addEventListener("click", open);
+    const addBtn = $("#recurring-add");
+    if (addBtn) addBtn.addEventListener("click", () => openEdit(null));
+    $("#rec-edit-save").addEventListener("click", save);
+    $("#rec-delete").addEventListener("click", remove);
+    $$("[data-rec-type]").forEach((b) => {
+      b.addEventListener("click", () => {
+        editType = b.dataset.recType;
+        editCategory = null;
+        renderSeg();
+        renderCats();
+      });
+    });
+  }
+
+  return { open, bind };
+})();
 
 /* ==========================================================================
    BUDGETS — per-category monthly limits
@@ -1418,6 +1645,38 @@ function silverStats(p, gramPrice) {
   const targetHit = p.targetPrice > 0 && unitNow >= p.targetPrice;
   return { unitNow, cost, value, pl, plPct, targetHit };
 }
+/* Apply due recurring rules — fired at startup and on tab switch.
+   A rule has shape:
+   { id, type, category, amount, description, dayOfMonth, lastApplied (YYYY-MM) }
+   For each rule, if current month not yet applied AND today's day ≥ dayOfMonth,
+   we synthesize a transaction dated today and stamp lastApplied. */
+function applyRecurringDue() {
+  const rules = Store.state.recurring || [];
+  if (!rules.length) return 0;
+  const today = new Date();
+  const day = today.getDate();
+  const monthKey = currentMonthKey();
+  let added = 0;
+  Store.update((s) => {
+    for (const r of s.recurring || []) {
+      if (r.lastApplied === monthKey) continue;
+      if (day < (r.dayOfMonth || 1)) continue;
+      s.transactions.push({
+        id: uid(),
+        type: r.type,
+        category: r.category,
+        amount: Number(r.amount) || 0,
+        description: r.description || "",
+        date: todayISO(),
+        recurringId: r.id,
+      });
+      r.lastApplied = monthKey;
+      added++;
+    }
+  });
+  return added;
+}
+
 function budgetSpent(category, monthKey) {
   return Store.state.transactions
     .filter(
@@ -3625,6 +3884,16 @@ function init() {
   Prompt.bind();
   DatePicker.bind();
   Budgets.bind();
+  Recurring.bind();
+
+  // Apply any due recurring rules — startup only
+  const applied = applyRecurringDue();
+  if (applied > 0) {
+    setTimeout(
+      () => Toast.show(`${applied} ${t("toast.recurringApplied")}`, "success"),
+      400,
+    );
+  }
 
   // Wrap native date inputs with custom pill
   ["#tx-date", "#pending-date", "#collect-date", "#silver-buy-date"].forEach(

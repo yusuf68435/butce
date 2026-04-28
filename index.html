@@ -45,7 +45,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=26" />
+    <link rel="stylesheet" href="style.css?v=27" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -704,6 +704,22 @@
               </div>
               <span class="chev" data-icon="chevron-right"></span>
             </button>
+            <button type="button" class="settings-row" id="open-recurring">
+              <div class="ic recurring" data-icon="repeat"></div>
+              <div>
+                <div class="label" data-i18n="settings.recurring">
+                  Tekrarlayan İşlemler
+                </div>
+                <div
+                  class="sub"
+                  id="recurring-sub"
+                  data-i18n="settings.recurringSub"
+                >
+                  Her ay otomatik kira/maaş/fatura
+                </div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
             <button
               type="button"
               class="settings-row"
@@ -778,6 +794,112 @@
       hidden
     />
     <input type="file" id="import-csv-file" accept="text/csv,.csv" hidden />
+
+    <!-- Recurring transactions sheet -->
+    <div
+      class="sheet"
+      id="sheet-recurring"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="recurring-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>Kapat</button>
+        <h2 class="title" id="recurring-title">Tekrarlayan İşlemler</h2>
+        <button class="sheet-action right bold" id="recurring-add">Yeni</button>
+      </header>
+      <div class="sheet-body">
+        <div class="budget-hint" id="recurring-hint">
+          Her ay belirtilen günde otomatik olarak hareketlere eklenir.
+        </div>
+        <div class="card" id="recurring-list"></div>
+      </div>
+    </div>
+
+    <!-- Recurring rule editor sheet -->
+    <div
+      class="sheet"
+      id="sheet-recurring-edit"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rec-edit-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="rec-edit-title">Yeni Tekrarlayan</h2>
+        <button class="sheet-action right bold" id="rec-edit-save">
+          Kaydet
+        </button>
+      </header>
+      <form class="sheet-body sheet-stagger" id="rec-edit-form" novalidate>
+        <div class="seg" style="--n: 2">
+          <span class="seg-thumb" id="rec-thumb"></span>
+          <button type="button" class="seg-opt active" data-rec-type="expense">
+            Gider
+          </button>
+          <button type="button" class="seg-opt" data-rec-type="income">
+            Gelir
+          </button>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Tutar</div>
+          <input
+            type="text"
+            inputmode="decimal"
+            id="rec-amount"
+            class="input"
+            placeholder="0"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Kategori</div>
+          <div class="chips" id="rec-cat-grid"></div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Açıklama (opsiyonel)</div>
+          <input
+            type="text"
+            id="rec-desc"
+            class="input"
+            placeholder="Ör. Aylık kira"
+          />
+        </div>
+
+        <div class="field">
+          <div class="field-label">Ayın Günü</div>
+          <input
+            type="number"
+            min="1"
+            max="28"
+            id="rec-day"
+            class="input"
+            value="1"
+          />
+        </div>
+
+        <button
+          type="button"
+          class="sheet-action danger"
+          id="rec-delete"
+          hidden
+          style="
+            text-align: center;
+            padding: 14px;
+            background: var(--bg-2);
+            border-radius: var(--r-input);
+            margin-top: 14px;
+            border: 1px solid var(--hairline);
+          "
+        >
+          Kuralı Sil
+        </button>
+      </form>
+    </div>
 
     <!-- Budget limits sheet -->
     <div
@@ -888,6 +1010,6 @@
       </form>
     </div>
 
-    <script src="app.js?v=26" defer></script>
+    <script src="app.js?v=27" defer></script>
   </body>
 </html>

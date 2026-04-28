@@ -2060,6 +2060,9 @@ html[data-theme="dark"] .chip.active {
 .settings-row .ic.notif {
   background: linear-gradient(135deg, #ffb66e, #ff7a45);
 }
+.settings-row .ic.recurring {
+  background: linear-gradient(135deg, #38c97e, #007a5e);
+}
 
 /* Budget editor */
 .budget-hint {
