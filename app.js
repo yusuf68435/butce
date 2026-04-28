@@ -183,6 +183,12 @@ const I18N = {
     "settings.reset": "Tüm Veriyi Sil",
     "settings.resetSub": "Bu işlem geri alınamaz",
     "settings.lang": "Dil",
+    "settings.notif": "Bütçe Bildirimleri",
+    "settings.notifOff": "Limit aşıldığında sistem bildirimi gönder",
+    "settings.notifOn": "Bildirimler aktif",
+    "settings.notifDenied": "İzin reddedildi — tarayıcı ayarından açabilirsin",
+    "notif.budgetTitle": "Bütçe Limiti Aşıldı",
+    "notif.budgetOver": "limiti aştı",
     "toast.deleted": "Silindi",
     "toast.txDeleted": "Hareket silindi",
     "toast.pendingDeleted": "Bekleyen silindi",
@@ -295,6 +301,12 @@ const I18N = {
     "settings.reset": "Delete All Data",
     "settings.resetSub": "This cannot be undone",
     "settings.lang": "Language",
+    "settings.notif": "Budget Notifications",
+    "settings.notifOff": "Send a system notification when limit exceeded",
+    "settings.notifOn": "Notifications enabled",
+    "settings.notifDenied": "Permission denied — enable from browser settings",
+    "notif.budgetTitle": "Budget Limit Exceeded",
+    "notif.budgetOver": "over limit",
     "toast.deleted": "Deleted",
     "toast.txDeleted": "Transaction deleted",
     "toast.pendingDeleted": "Pending deleted",
@@ -419,6 +431,7 @@ const ICONS = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 7 10 7-.6 1.2-1.4 2.3-2.4 3.3M6.5 6.5C3.4 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.3 4.3-.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
   globe:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
 };
 
 function hydrateIcons(root = document) {
@@ -631,6 +644,42 @@ function categoryMeta(name) {
 /* ==========================================================================
    HAPTICS (Vibration API — best-effort, silent if unsupported)
    ========================================================================== */
+
+const Notifier = {
+  supported() {
+    return typeof Notification !== "undefined";
+  },
+  permission() {
+    return this.supported() ? Notification.permission : "denied";
+  },
+  async requestPermission() {
+    if (!this.supported()) return "denied";
+    if (Notification.permission === "default") {
+      try {
+        return await Notification.requestPermission();
+      } catch {
+        return "denied";
+      }
+    }
+    return Notification.permission;
+  },
+  send(title, body, opts = {}) {
+    if (this.permission() !== "granted") return null;
+    try {
+      return new Notification(title, {
+        body,
+        icon:
+          opts.icon ||
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='42' fill='%23E5364E'/><text x='96' y='128' font-family='-apple-system,system-ui' font-size='110' font-weight='700' fill='white' text-anchor='middle'>!</text></svg>",
+        tag: opts.tag || "ggai",
+        renotify: false,
+        silent: false,
+      });
+    } catch {
+      return null;
+    }
+  },
+};
 
 const Haptics = {
   light() {
@@ -2370,6 +2419,7 @@ const TxSheet = (() => {
       const limit = Store.state.budgets?.[category] || 0;
       if (limit > 0) {
         const spent = budgetSpent(category, monthKeyOf(date));
+        const overshoot = spent - limit;
         if (spent > limit) {
           Toast.show(
             `${category}: ${fmt.try(spent)} / ${fmt.try(limit)} — limit aşıldı`,
@@ -2377,6 +2427,11 @@ const TxSheet = (() => {
             { duration: 4000 },
           );
           Haptics.warning();
+          Notifier.send(
+            t("notif.budgetTitle"),
+            `${category}: ${fmt.try(overshoot)} ${t("notif.budgetOver")}`,
+            { tag: "budget-" + category },
+          );
         } else if (spent > limit * 0.9) {
           Toast.show(
             `${category}: limitin %${Math.round((spent / limit) * 100)}'ine ulaşıldı`,
@@ -3397,6 +3452,46 @@ function bindHaptics() {
   );
 }
 
+async function bindNotifToggle() {
+  const btn = $("#notif-toggle");
+  if (!btn) return;
+  function syncUI() {
+    const perm = Notifier.permission();
+    const on = perm === "granted";
+    btn.setAttribute("aria-pressed", String(on));
+    const sub = $("#notif-sub");
+    if (sub) {
+      sub.textContent =
+        perm === "granted"
+          ? t("settings.notifOn")
+          : perm === "denied"
+            ? t("settings.notifDenied")
+            : t("settings.notifOff");
+    }
+  }
+  syncUI();
+  btn.addEventListener("click", async () => {
+    if (!Notifier.supported()) {
+      Toast.show(
+        "Bu tarayıcıda bildirim desteği yok / Notifications unsupported",
+        "info",
+      );
+      return;
+    }
+    if (Notifier.permission() === "granted") {
+      // Cannot revoke programmatically — show hint
+      Toast.show(t("settings.notifOn"), "info");
+      return;
+    }
+    const result = await Notifier.requestPermission();
+    syncUI();
+    if (result === "granted") {
+      Toast.show(t("settings.notifOn"), "success");
+      Notifier.send(t("notif.budgetTitle"), t("settings.notifOn"));
+    }
+  });
+}
+
 function bindPrivacyToggle() {
   const btn = $("#privacy-toggle");
   if (btn) btn.addEventListener("click", () => Privacy.toggle());
@@ -3500,6 +3595,7 @@ function init() {
   bindTopbarScrollBlur();
   bindHeroTilt();
   bindPrivacyToggle();
+  bindNotifToggle();
   bindPullToRefresh();
   bindHaptics();
 

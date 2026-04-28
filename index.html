@@ -45,7 +45,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=25" />
+    <link rel="stylesheet" href="style.css?v=26" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -690,17 +690,36 @@
         </section>
 
         <section class="section" style="padding-left: 0; padding-right: 0">
-          <div class="section-title">Bütçe</div>
+          <div class="section-title" data-i18n="settings.budget">Bütçe</div>
           <div class="card">
             <button type="button" class="settings-row" id="open-budgets">
               <div class="ic budget" data-icon="trend"></div>
               <div>
-                <div class="label">Kategori Limitleri</div>
-                <div class="sub" id="budget-sub">
+                <div class="label" data-i18n="settings.budgetLimits">
+                  Kategori Limitleri
+                </div>
+                <div class="sub" id="budget-sub" data-i18n="settings.budgetSub">
                   Aylık harcama limitleri belirle
                 </div>
               </div>
               <span class="chev" data-icon="chevron-right"></span>
+            </button>
+            <button
+              type="button"
+              class="settings-row"
+              id="notif-toggle"
+              aria-pressed="false"
+            >
+              <div class="ic notif" data-icon="bell"></div>
+              <div>
+                <div class="label" data-i18n="settings.notif">
+                  Bütçe Bildirimleri
+                </div>
+                <div class="sub" id="notif-sub" data-i18n="settings.notifOff">
+                  Limit aşıldığında sistem bildirimi gönder
+                </div>
+              </div>
+              <span class="switch" aria-hidden="true"></span>
             </button>
           </div>
         </section>
@@ -869,6 +888,6 @@
       </form>
     </div>
 
-    <script src="app.js?v=25" defer></script>
+    <script src="app.js?v=26" defer></script>
   </body>
 </html>

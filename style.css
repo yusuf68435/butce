@@ -2057,6 +2057,9 @@ html[data-theme="dark"] .chip.active {
 .settings-row .ic.lang {
   background: linear-gradient(135deg, #5c7bff, #1b2547);
 }
+.settings-row .ic.notif {
+  background: linear-gradient(135deg, #ffb66e, #ff7a45);
+}
 
 /* Budget editor */
 .budget-hint {
