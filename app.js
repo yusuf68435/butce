@@ -212,6 +212,15 @@ const I18N = {
     "settings.fxLast": "Son güncelleme",
     "toast.fxUpdated": "Kur güncellendi",
     "toast.fxFailed": "Kur alınamadı — eski veriler kullanılıyor",
+    "field.receipt": "Fiş Fotoğrafı",
+    "btn.attachPhoto": "+ Fotoğraf Ekle",
+    "btn.changePhoto": "Değiştir",
+    "btn.removePhoto": "Kaldır",
+    "title.receipt": "Fiş",
+    "toast.photoSaved": "Fiş eklendi",
+    "toast.photoRemoved": "Fiş kaldırıldı",
+    "toast.photoTooLarge": "Fotoğraf çok büyük — sıkıştırılamadı",
+    "toast.photoFailed": "Fotoğraf yüklenemedi",
     "notif.budgetTitle": "Bütçe Limiti Aşıldı",
     "notif.budgetOver": "limiti aştı",
     "title.newRecurring": "Yeni Tekrarlayan",
@@ -350,6 +359,15 @@ const I18N = {
     "settings.fxLast": "Last updated",
     "toast.fxUpdated": "Rates updated",
     "toast.fxFailed": "Could not fetch rates — using cached values",
+    "field.receipt": "Receipt Photo",
+    "btn.attachPhoto": "+ Attach Photo",
+    "btn.changePhoto": "Replace",
+    "btn.removePhoto": "Remove",
+    "title.receipt": "Receipt",
+    "toast.photoSaved": "Receipt attached",
+    "toast.photoRemoved": "Receipt removed",
+    "toast.photoTooLarge": "Photo too large — could not compress",
+    "toast.photoFailed": "Could not load photo",
     "notif.budgetTitle": "Budget Limit Exceeded",
     "notif.budgetOver": "over limit",
     "title.newRecurring": "New Recurring",
@@ -488,6 +506,10 @@ const ICONS = {
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
   repeat:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m17 1 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+  paperclip:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.65 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.83l8.49-8.48"/></svg>',
+  camera:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3l2-3h8l2 3h3v12H3z"/><circle cx="12" cy="13" r="4"/></svg>',
 };
 
 function hydrateIcons(root = document) {
@@ -1110,6 +1132,158 @@ const Privacy = (() => {
   }
   return { init, toggle, get, set, apply };
 })();
+
+/* ==========================================================================
+   PHOTOS (IndexedDB — receipt attachments, blob storage)
+   ========================================================================== */
+
+const Photos = (() => {
+  const DB_NAME = "ggai-photos";
+  const DB_VERSION = 1;
+  const STORE = "photos";
+  let _db = null;
+  let _opening = null;
+
+  function open() {
+    if (_db) return Promise.resolve(_db);
+    if (_opening) return _opening;
+    if (typeof indexedDB === "undefined")
+      return Promise.reject(new Error("no-idb"));
+    _opening = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = () => {
+        _db = req.result;
+        resolve(_db);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    return _opening;
+  }
+
+  async function add(blob) {
+    const db = await open();
+    const id = uid();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put({ id, blob, ts: Date.now() });
+      tx.oncomplete = () => resolve(id);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function get(id) {
+    if (!id) return null;
+    try {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, "readonly");
+        const req = tx.objectStore(STORE).get(id);
+        req.onsuccess = () => resolve(req.result?.blob || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function remove(id) {
+    if (!id) return;
+    try {
+      const db = await open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      });
+    } catch {}
+  }
+
+  async function clear() {
+    try {
+      const db = await open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      });
+    } catch {}
+  }
+
+  return { add, get, remove, clear };
+})();
+
+// Resize + compress an image File to JPEG blob (max ~1280px, quality 0.85)
+async function compressImage(file, maxW = 1280, quality = 0.85) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res;
+      img.onerror = rej;
+      img.src = url;
+    });
+    const ratio = Math.min(1, maxW / Math.max(img.naturalWidth, 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * ratio));
+    const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    return await new Promise((r) => canvas.toBlob(r, "image/jpeg", quality));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Lazy-load a thumbnail. Uses IntersectionObserver when available so off-screen
+// rows don't decode immediately; falls back to direct load otherwise.
+function lazyLoadThumb(imgEl, photoId) {
+  if (!imgEl || !photoId) return;
+  function load() {
+    Photos.get(photoId).then((blob) => {
+      if (!blob) return;
+      const u = URL.createObjectURL(blob);
+      imgEl.addEventListener("load", () => URL.revokeObjectURL(u), {
+        once: true,
+      });
+      imgEl.src = u;
+    });
+  }
+  if (typeof IntersectionObserver === "undefined") {
+    load();
+    return;
+  }
+  const obs = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          load();
+          obs.disconnect();
+          return;
+        }
+      }
+    },
+    { rootMargin: "300px" },
+  );
+  obs.observe(imgEl);
+  // Safety net: if the observer never fires (rare browser quirks, embedded
+  // scroll containers), load anyway after a short idle delay.
+  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 600));
+  idle(() => {
+    if (!imgEl.src) {
+      obs.disconnect();
+      load();
+    }
+  });
+}
 
 /* ==========================================================================
    CURRENCY (display-only switch — TRY/USD/EUR; FX fetch on demand)
@@ -2285,11 +2459,36 @@ function renderTxList(list) {
       type: "button",
       onclick: () => TxSheet.open(t.id),
     });
-    row.appendChild(
-      el("span", { class: `row-icon ${meta.kind}`, "data-icon": meta.icon }),
-    );
+    let thumb = null;
+    if (t.photoId) {
+      thumb = el("img", {
+        class: "row-thumb",
+        alt: "",
+        loading: "lazy",
+        decoding: "async",
+      });
+      row.appendChild(thumb);
+    } else {
+      row.appendChild(
+        el("span", {
+          class: `row-icon ${meta.kind}`,
+          "data-icon": meta.icon,
+        }),
+      );
+    }
     const text = el("div", { class: "row-text" });
-    text.appendChild(el("div", { class: "row-title" }, t.category));
+    const title = el("div", { class: "row-title" });
+    title.appendChild(document.createTextNode(t.category));
+    if (t.photoId) {
+      title.appendChild(
+        el("span", {
+          class: "row-clip",
+          "data-icon": "paperclip",
+          "aria-label": "Fiş ekli",
+        }),
+      );
+    }
+    text.appendChild(title);
     text.appendChild(el("div", { class: "row-sub" }, sub));
     row.appendChild(text);
     row.appendChild(
@@ -2304,6 +2503,9 @@ function renderTxList(list) {
     wrap.appendChild(row);
     root.appendChild(wrap);
 
+    // Now that the thumb is in the DOM, attach the lazy-loader (observer needs layout)
+    if (thumb && t.photoId) lazyLoadThumb(thumb, t.photoId);
+
     bindSwipeRow(wrap, async () => {
       const ok = await Confirm.show({
         title: "Hareket silinsin mi?",
@@ -2315,6 +2517,8 @@ function renderTxList(list) {
         wrap.classList.remove("armed");
         return;
       }
+      // Cleanup attached photo
+      if (t.photoId) await Photos.remove(t.photoId);
       Store.update((s) => {
         s.transactions = s.transactions.filter((x) => x.id !== t.id);
       });
@@ -2720,14 +2924,23 @@ const TxSheet = (() => {
   let editingId = null;
   let type = "expense";
   let category = null;
+  // Photo state — separates "currently saved" from "pending change"
+  let currentPhotoId = null; // photoId persisted on the tx (or null)
+  let pendingBlob = null; // newly attached blob waiting to be saved
+  let pendingRemove = false; // user removed an existing photo
+  let _previewUrl = null;
 
   function open(id = null) {
     editingId = id;
+    pendingBlob = null;
+    pendingRemove = false;
+    currentPhotoId = null;
     if (id) {
       const t = Store.state.transactions.find((x) => x.id === id);
       if (!t) return;
       type = t.type;
       category = t.category;
+      currentPhotoId = t.photoId || null;
       $("#tx-title").textContent = "Hareket";
       $("#tx-amount").value = inputAmount(t.amount);
       $("#tx-desc").value = t.description || "";
@@ -2744,9 +2957,89 @@ const TxSheet = (() => {
     }
     renderSeg();
     renderCats();
+    renderReceipt();
     Sheets.open("sheet-tx", () =>
       setTimeout(() => $("#tx-amount").focus(), 250),
     );
+  }
+
+  function renderReceipt() {
+    const preview = $("#receipt-preview");
+    const attachBtn = $("#receipt-attach");
+    const img = $("#receipt-thumb");
+    if (_previewUrl) {
+      URL.revokeObjectURL(_previewUrl);
+      _previewUrl = null;
+    }
+    const showing = pendingBlob || (currentPhotoId && !pendingRemove);
+    if (!showing) {
+      preview.hidden = true;
+      attachBtn.hidden = false;
+      img.removeAttribute("src");
+      return;
+    }
+    attachBtn.hidden = true;
+    preview.hidden = false;
+    if (pendingBlob) {
+      _previewUrl = URL.createObjectURL(pendingBlob);
+      img.src = _previewUrl;
+    } else if (currentPhotoId) {
+      Photos.get(currentPhotoId).then((blob) => {
+        if (!blob) return;
+        if (_previewUrl) URL.revokeObjectURL(_previewUrl);
+        _previewUrl = URL.createObjectURL(blob);
+        img.src = _previewUrl;
+      });
+    }
+  }
+
+  async function pickPhoto() {
+    $("#receipt-file").click();
+  }
+
+  async function onPickFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      Toast.show(t("toast.photoFailed"), "error");
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      if (!compressed || compressed.size > 4_000_000) {
+        Toast.show(t("toast.photoTooLarge"), "error");
+        return;
+      }
+      pendingBlob = compressed;
+      pendingRemove = false;
+      Haptics.light();
+      renderReceipt();
+    } catch {
+      Toast.show(t("toast.photoFailed"), "error");
+    }
+  }
+
+  function removePhoto() {
+    pendingBlob = null;
+    pendingRemove = true;
+    Haptics.light();
+    renderReceipt();
+  }
+
+  function viewPhoto() {
+    const img = $("#receipt-viewer-img");
+    if (!img) return;
+    if (pendingBlob) {
+      img.src = URL.createObjectURL(pendingBlob);
+    } else if (currentPhotoId) {
+      Photos.get(currentPhotoId).then((blob) => {
+        if (blob) img.src = URL.createObjectURL(blob);
+      });
+    } else {
+      return;
+    }
+    Sheets.open("sheet-receipt");
   }
 
   function renderSeg() {
@@ -2806,7 +3099,7 @@ const TxSheet = (() => {
     );
   }
 
-  function save() {
+  async function save() {
     const amount = parseAmount($("#tx-amount").value);
     if (!amount || amount <= 0) {
       $("#tx-amount").focus();
@@ -2819,19 +3112,50 @@ const TxSheet = (() => {
     }
     const date = $("#tx-date").value || todayISO();
     const description = $("#tx-desc").value.trim();
+
+    // Resolve photoId: keep, replace, or remove
+    let photoId = currentPhotoId;
+    if (pendingBlob) {
+      try {
+        const newId = await Photos.add(pendingBlob);
+        // Replace: remove old photo
+        if (currentPhotoId && currentPhotoId !== newId) {
+          await Photos.remove(currentPhotoId);
+        }
+        photoId = newId;
+      } catch {
+        Toast.show(t("toast.photoFailed"), "error");
+        return;
+      }
+    } else if (pendingRemove && currentPhotoId) {
+      await Photos.remove(currentPhotoId);
+      photoId = null;
+    }
+
     Store.update((s) => {
       if (editingId) {
-        const t = s.transactions.find((x) => x.id === editingId);
-        if (t) Object.assign(t, { type, category, amount, description, date });
+        const tr = s.transactions.find((x) => x.id === editingId);
+        if (tr)
+          Object.assign(tr, {
+            type,
+            category,
+            amount,
+            description,
+            date,
+            photoId: photoId || undefined,
+          });
+        if (tr && !photoId) delete tr.photoId;
       } else {
-        s.transactions.push({
+        const tx = {
           id: uid(),
           type,
           category,
           amount,
           description,
           date,
-        });
+        };
+        if (photoId) tx.photoId = photoId;
+        s.transactions.push(tx);
       }
       s.settings.lastUsedCategory = s.settings.lastUsedCategory || {};
       s.settings.lastUsedCategory[type] = category;
@@ -2874,6 +3198,9 @@ const TxSheet = (() => {
       danger: true,
     });
     if (!ok) return;
+    // Cleanup: remove attached photo too
+    const txn = Store.state.transactions.find((x) => x.id === editingId);
+    if (txn?.photoId) await Photos.remove(txn.photoId);
     Store.update((s) => {
       s.transactions = s.transactions.filter((t) => t.id !== editingId);
     });
@@ -2884,6 +3211,16 @@ const TxSheet = (() => {
   function bind() {
     $("#tx-save").addEventListener("click", save);
     $("#tx-delete").addEventListener("click", remove);
+    const attach = $("#receipt-attach");
+    if (attach) attach.addEventListener("click", pickPhoto);
+    const file = $("#receipt-file");
+    if (file) file.addEventListener("change", onPickFile);
+    const replace = $("#receipt-replace");
+    if (replace) replace.addEventListener("click", pickPhoto);
+    const rm = $("#receipt-remove");
+    if (rm) rm.addEventListener("click", removePhoto);
+    const thumb = $("#receipt-thumb");
+    if (thumb) thumb.addEventListener("click", viewPhoto);
     $$("[data-tx-type]", $("#sheet-tx")).forEach((b) => {
       b.addEventListener("click", () => {
         type = b.dataset.txType;
@@ -3492,6 +3829,8 @@ const Settings = (() => {
         });
         if (!ok) return;
 
+        // Backup file does not embed photos — clear stale blobs to avoid orphans
+        await Photos.clear();
         Store.replace({
           transactions: incoming.transactions || [],
           pending: incoming.pending || [],
@@ -3665,6 +4004,7 @@ const Settings = (() => {
       danger: true,
     });
     if (!ok2) return;
+    await Photos.clear();
     Store.reset();
     Sheets.close("sheet-settings");
     Toast.show("Tüm veri silindi", "info");

@@ -45,7 +45,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=28" />
+    <link rel="stylesheet" href="style.css?v=29" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -355,6 +355,48 @@
           <div class="field-label">Tarih</div>
           <input type="date" id="tx-date" class="input" />
         </div>
+
+        <div class="field">
+          <div class="field-label" data-i18n="field.receipt">Fiş Fotoğrafı</div>
+          <div class="receipt-zone" id="receipt-zone">
+            <button
+              type="button"
+              class="receipt-attach"
+              id="receipt-attach"
+              data-i18n="btn.attachPhoto"
+            >
+              + Fotoğraf Ekle
+            </button>
+            <div class="receipt-preview" id="receipt-preview" hidden>
+              <img id="receipt-thumb" alt="" aria-label="Fiş önizlemesi" />
+              <div class="receipt-actions">
+                <button
+                  type="button"
+                  class="receipt-action"
+                  id="receipt-replace"
+                  data-i18n="btn.changePhoto"
+                >
+                  Değiştir
+                </button>
+                <button
+                  type="button"
+                  class="receipt-action danger"
+                  id="receipt-remove"
+                  data-i18n="btn.removePhoto"
+                >
+                  Kaldır
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <input
+          type="file"
+          id="receipt-file"
+          accept="image/*"
+          capture="environment"
+          hidden
+        />
 
         <button
           type="button"
@@ -1039,6 +1081,31 @@
       </form>
     </div>
 
-    <script src="app.js?v=28" defer></script>
+    <!-- Receipt viewer sheet (full-size photo) -->
+    <div
+      class="sheet receipt-viewer"
+      id="sheet-receipt"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="receipt-viewer-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>Kapat</button>
+        <h2 class="title" id="receipt-viewer-title" data-i18n="title.receipt">
+          Fiş
+        </h2>
+        <span></span>
+      </header>
+      <div class="sheet-body receipt-viewer-body">
+        <img
+          id="receipt-viewer-img"
+          alt="Fiş tam görünüm"
+          aria-label="Fiş tam görünüm"
+        />
+      </div>
+    </div>
+
+    <script src="app.js?v=29" defer></script>
   </body>
 </html>
