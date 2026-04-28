@@ -2955,10 +2955,27 @@ function bindTopbarScrollBlur() {
   );
 }
 
+function autoLabelInputs() {
+  // Associate every .field-label div with its sibling input via aria-labelledby
+  $$(".field").forEach((field) => {
+    const lbl = field.querySelector(".field-label");
+    const input = field.querySelector(".input, input");
+    if (!lbl || !input) return;
+    if (!lbl.id) lbl.id = "lbl-" + Math.random().toString(36).slice(2, 8);
+    if (
+      !input.hasAttribute("aria-label") &&
+      !input.hasAttribute("aria-labelledby")
+    ) {
+      input.setAttribute("aria-labelledby", lbl.id);
+    }
+  });
+}
+
 function init() {
   Theme.init();
   Privacy.init();
   hydrateIcons();
+  autoLabelInputs();
   bindTopbarScrollBlur();
   bindHeroTilt();
   bindPrivacyToggle();

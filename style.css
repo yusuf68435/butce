@@ -17,9 +17,9 @@
 
   /* Foreground (light) — fg-3 hits 4.5:1 on bg / bg-2 */
   --fg-1: #0a0e1a;
-  --fg-2: rgba(10, 14, 26, 0.7);
-  --fg-3: rgba(10, 14, 26, 0.55);
-  --fg-4: rgba(10, 14, 26, 0.3);
+  --fg-2: rgba(10, 14, 26, 0.74);
+  --fg-3: rgba(10, 14, 26, 0.62);
+  --fg-4: rgba(10, 14, 26, 0.36);
   --hairline: rgba(10, 14, 26, 0.08);
   --hairline-strong: rgba(10, 14, 26, 0.14);
 
@@ -747,7 +747,7 @@ html[data-privacy="true"] .donut-center .value::after {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fg-3);
+  color: var(--fg-2);
   padding: 4px 6px 10px;
 }
 
@@ -1199,7 +1199,7 @@ html[data-theme="dark"] .tab.active {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: var(--fg-3);
+  color: var(--fg-2);
   text-transform: uppercase;
 }
 .wealth-amount {
@@ -1551,7 +1551,7 @@ html[data-theme="dark"] .price-card .pull-btn {
 }
 .empty-sub {
   font-size: 14px;
-  color: var(--fg-3);
+  color: var(--fg-2);
   margin-top: 4px;
   max-width: 260px;
 }
