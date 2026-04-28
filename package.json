@@ -1,11 +1,18 @@
 {
-  "name": "ggai-capture",
+  "name": "butce",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
+  "description": "Bütçe — sunucusuz kişisel finans PWA",
   "scripts": {
-    "capture": "node tools/capture.mjs"
+    "build": "node tools/build.mjs",
+    "capture": "node tools/capture.mjs",
+    "serve": "python -m http.server 8080",
+    "serve:dist": "cd dist && python -m http.server 8080"
   },
   "devDependencies": {
-    "playwright": "^1.49.0"
+    "csso": "^5.0.5",
+    "playwright": "^1.49.0",
+    "terser": "^5.36.0"
   }
 }

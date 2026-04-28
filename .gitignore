@@ -4,6 +4,9 @@ package-lock.json
 
 # Generated artifacts
 screenshots/
+dist/
+lh-*.json
+lighthouse-report.json
 
 # Local backups
 butce-yedek-*.json
