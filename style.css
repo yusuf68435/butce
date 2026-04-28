@@ -774,6 +774,44 @@ html[data-privacy="true"] .donut-center .value::after {
   transition:
     transform 0.16s var(--ease-spring),
     background 0.18s;
+  touch-action: pan-y;
+}
+.row.swiping {
+  transition: none;
+}
+/* Swipe-action layer (absolutely positioned beneath the row) */
+.swipe-wrap {
+  position: relative;
+  background: var(--neg);
+  overflow: hidden;
+}
+.swipe-wrap .swipe-action {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  background: var(--neg);
+}
+.swipe-wrap .swipe-action svg {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+}
+.swipe-wrap > .row {
+  transform: translateX(0);
+  position: relative;
+  z-index: 1;
+}
+.swipe-wrap.armed > .row {
+  transform: translateX(-88px);
 }
 .row + .row::before {
   content: "";
@@ -1059,6 +1097,81 @@ html[data-theme="dark"] .tab.active {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ============ TREND CHART (6-month net balance) ============ */
+.trend-card {
+  background: var(--bg-2);
+  border-radius: var(--r-card-sm);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  padding: 16px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.trend-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.trend-meta .label {
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.trend-meta .delta {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+.trend-meta .delta.pos {
+  background: var(--pos-bg);
+  color: var(--pos);
+}
+.trend-meta .delta.neg {
+  background: var(--neg-bg);
+  color: var(--neg);
+}
+.trend-chart {
+  position: relative;
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.trend-bar {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.trend-bar .col {
+  width: 100%;
+  background: linear-gradient(180deg, var(--neon-1), #38c97e);
+  border-radius: 6px 6px 2px 2px;
+  height: 0;
+  transition: height 0.8s var(--ease-out);
+}
+.trend-bar .col.neg {
+  background: linear-gradient(180deg, #ff7585, var(--neg));
+}
+.trend-bar.current .col {
+  box-shadow: 0 0 14px var(--neon-glow);
+}
+.trend-bar .lab {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.trend-bar.current .lab {
+  color: var(--fg-1);
 }
 
 /* ============ DONUT + BAR LIST ============ */

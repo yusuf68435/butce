@@ -1272,8 +1272,51 @@ function renderCash() {
   drawSparkline($("#cash-spark"), monthlyTrend(6, "balance"));
 
   renderWealth();
+  renderTrend();
   renderExpenseChart(t.list);
   renderTxList(t.list);
+}
+
+function renderTrend() {
+  const data = monthlyTrend(6, "balance");
+  if (!data || data.length < 2) {
+    $("#trend-section").hidden = true;
+    return;
+  }
+  $("#trend-section").hidden = false;
+
+  const last = data[data.length - 1].v;
+  const prev = data[data.length - 2].v;
+  const delta = last - prev;
+  const meta = $("#trend-meta");
+  clear(meta);
+  meta.appendChild(el("span", { class: "label" }, "Net Bakiye Değişimi"));
+  meta.appendChild(
+    el(
+      "span",
+      { class: `delta ${delta >= 0 ? "pos" : "neg"}` },
+      fmt.signed(delta),
+    ),
+  );
+
+  const chart = $("#trend-chart");
+  clear(chart);
+  const maxAbs = Math.max(...data.map((d) => Math.abs(d.v)), 1);
+  data.forEach((d, i) => {
+    const isCurrent = i === data.length - 1;
+    const bar = el("div", {
+      class: `trend-bar${isCurrent ? " current" : ""}`,
+    });
+    const col = el("div", { class: `col${d.v < 0 ? " neg" : ""}` });
+    const [y, m] = d.key.split("-").map(Number);
+    bar.appendChild(col);
+    bar.appendChild(el("div", { class: "lab" }, TR_MONTHS_SHORT[m - 1]));
+    chart.appendChild(bar);
+    requestAnimationFrame(() => {
+      const h = Math.max(4, (Math.abs(d.v) / maxAbs) * 80);
+      col.style.height = h + "px";
+    });
+  });
 }
 
 function renderWealth() {
@@ -1398,10 +1441,23 @@ function renderTxList(list) {
     const sub = t.description
       ? `${t.description} · ${fmt.date(t.date)}`
       : fmt.date(t.date);
+
+    const wrap = el("div", { class: "swipe-wrap", dataset: { id: t.id } });
+    const action = el(
+      "button",
+      {
+        class: "swipe-action",
+        type: "button",
+        "aria-label": "Sil",
+      },
+      el("span", { "data-icon": "trash" }),
+      "Sil",
+    );
+    wrap.appendChild(action);
+
     const row = el("button", {
       class: "row tappable",
       type: "button",
-      dataset: { id: t.id },
       onclick: () => TxSheet.open(t.id),
     });
     row.appendChild(
@@ -1420,7 +1476,25 @@ function renderTxList(list) {
         `${sign}${fmt.int(t.amount).replace(/^-/, "")} ₺`,
       ),
     );
-    root.appendChild(row);
+    wrap.appendChild(row);
+    root.appendChild(wrap);
+
+    bindSwipeRow(wrap, async () => {
+      const ok = await Confirm.show({
+        title: "Hareket silinsin mi?",
+        message: `${t.category} · ${fmt.try(t.amount)}`,
+        confirmLabel: "Sil",
+        danger: true,
+      });
+      if (!ok) {
+        wrap.classList.remove("armed");
+        return;
+      }
+      Store.update((s) => {
+        s.transactions = s.transactions.filter((x) => x.id !== t.id);
+      });
+      Toast.show("Hareket silindi", "success");
+    });
   }
   hydrateIcons(root);
   flipReorder(root, prev);
@@ -1702,6 +1776,60 @@ function renderPriceMeta() {
 /* ==========================================================================
    EMPTY STATE
    ========================================================================== */
+
+/* Swipe-to-delete — wraps a row in a .swipe-wrap with hidden action layer.
+   Swipe ≥ 60px arms; tap action / re-swipe / outside-tap dismisses. */
+function bindSwipeRow(wrap, onDelete) {
+  let startX = 0;
+  let lastX = 0;
+  let dragging = false;
+  let pid = null;
+  const row = wrap.querySelector(".row");
+  if (!row) return;
+
+  row.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    pid = e.pointerId;
+    startX = e.clientX;
+    lastX = e.clientX;
+    dragging = true;
+    row.classList.add("swiping");
+  });
+  row.addEventListener("pointermove", (e) => {
+    if (!dragging || e.pointerId !== pid) return;
+    const dx = Math.min(0, e.clientX - startX); // only leftward
+    if (Math.abs(dx) < 8) return;
+    lastX = e.clientX;
+    row.style.transform = `translateX(${Math.max(-100, dx)}px)`;
+  });
+  function end() {
+    if (!dragging) return;
+    dragging = false;
+    row.classList.remove("swiping");
+    const dx = lastX - startX;
+    if (dx < -45) {
+      wrap.classList.add("armed");
+      Haptics.medium();
+    } else {
+      wrap.classList.remove("armed");
+    }
+    row.style.transform = "";
+  }
+  row.addEventListener("pointerup", end);
+  row.addEventListener("pointercancel", end);
+  row.addEventListener("pointerleave", end);
+
+  // Click on action layer
+  const actionEl = wrap.querySelector(".swipe-action");
+  if (actionEl) actionEl.addEventListener("click", () => onDelete(wrap));
+
+  // Tap outside ⇒ disarm
+  document.addEventListener("pointerdown", (e) => {
+    if (!wrap.contains(e.target) && wrap.classList.contains("armed")) {
+      wrap.classList.remove("armed");
+    }
+  });
+}
 
 /* FLIP — animate list reorder/insertion when items have stable id */
 function flipReorder(parent, prevRects) {
