@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "capture": "node tools/capture.mjs",
+    "test": "node tools/tests.mjs",
     "serve": "python -m http.server 8080",
     "serve:dist": "cd dist && python -m http.server 8080"
   },

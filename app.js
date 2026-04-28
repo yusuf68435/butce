@@ -3541,4 +3541,4 @@ function init() {
   registerSW();
 }
 
-init();
+if (!globalThis.__GGAI_TEST__) init();
