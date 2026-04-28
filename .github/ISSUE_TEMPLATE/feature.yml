@@ -1,0 +1,28 @@
+name: ✨ Feature Request
+description: Yeni özellik öner / Suggest a feature
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Hangi sorunu çözüyor? / What problem does it solve?
+      placeholder: "Aylık tekrarlayan kira girişini her ay manuel ekliyorum…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Önerilen çözüm / Proposed solution
+      placeholder: "Ayın belli bir gününde otomatik tx ekleyen recurring rule sistemi"
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Düşündüğün alternatifler / Alternatives considered
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Ek bilgi / Additional context

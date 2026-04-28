@@ -1,0 +1,48 @@
+name: 🐛 Bug Report
+description: Bir hata bildir / Report a bug
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Açıklama / Description
+      description: Hatanın ne olduğunu kısaca anlat.
+      placeholder: "Tx silmek için sağa kaydırınca scrim sheet açılmıyor…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Adımlar / Steps to reproduce
+      placeholder: |
+        1. Nakit sekmesi
+        2. Bir hareketi sola kaydır
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Beklenen / Expected
+      placeholder: "Sil onay sheet'i açılmalı"
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Gerçekleşen / Actual
+      placeholder: "Hiçbir şey olmuyor, console hatasız"
+
+  - type: input
+    id: env
+    attributes:
+      label: Ortam / Environment
+      placeholder: "iOS Safari 17.4 / Chrome 122 desktop / ..."
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Ekran görüntüsü / Screenshots
+      description: Sürükle-bırak ile yapıştır.
