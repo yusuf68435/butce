@@ -1,5 +1,8 @@
 # Bütçe — Gelir Gider AI
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyusuf68435%2Fbutce&project-name=butce&repository-name=butce)
+[![CI](https://github.com/yusuf68435/butce/actions/workflows/ci.yml/badge.svg)](https://github.com/yusuf68435/butce/actions/workflows/ci.yml)
+
 Kişisel finans takibi yapan, **sunucusuz, çevrimdışı çalışan** PWA. Tüm veri tarayıcıda (`localStorage`) durur — sunucu, hesap, ücret yok.
 
 ## Özellikler
