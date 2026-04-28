@@ -184,6 +184,8 @@ const Store = (() => {
           income: p.categories?.income || [...DEFAULT_CATEGORIES.income],
           expense: p.categories?.expense || [...DEFAULT_CATEGORIES.expense],
         },
+        recurring: p.recurring || [],
+        budgets: p.budgets || {},
         settings: p.settings || {},
       };
     } catch {
@@ -199,6 +201,8 @@ const Store = (() => {
         income: [...DEFAULT_CATEGORIES.income],
         expense: [...DEFAULT_CATEGORIES.expense],
       },
+      recurring: [],
+      budgets: {},
       settings: {},
     };
   }
@@ -368,6 +372,56 @@ const Haptics = {
     if (navigator.vibrate) navigator.vibrate([20, 60, 20]);
   },
 };
+
+/* ==========================================================================
+   BUDGETS — per-category monthly limits
+   ========================================================================== */
+
+const Budgets = (() => {
+  function open() {
+    render();
+    Sheets.open("sheet-budgets");
+  }
+  function render() {
+    const root = $("#budget-list");
+    if (!root) return;
+    clear(root);
+    const cats = Store.state.categories.expense;
+    cats.forEach((cat, i) => {
+      const meta = categoryMeta(cat);
+      const color = CHART_PALETTE[i % CHART_PALETTE.length];
+      const current = Store.state.budgets?.[cat] || 0;
+      const row = el("div", { class: "budget-row" });
+      row.appendChild(
+        el("span", { class: "dot", style: `background:${color}` }),
+      );
+      row.appendChild(el("div", { class: "label" }, cat));
+      const input = el("input", {
+        type: "text",
+        inputmode: "decimal",
+        class: "input",
+        placeholder: "Limit yok",
+        value: current ? inputAmount(current) : "",
+        "aria-label": `${cat} aylık limit`,
+      });
+      input.addEventListener("change", () => {
+        const v = parseAmount(input.value);
+        Store.update((s) => {
+          s.budgets = s.budgets || {};
+          if (v > 0) s.budgets[cat] = v;
+          else delete s.budgets[cat];
+        });
+      });
+      row.appendChild(input);
+      root.appendChild(row);
+    });
+  }
+  function bind() {
+    const btn = $("#open-budgets");
+    if (btn) btn.addEventListener("click", open);
+  }
+  return { open, bind, render };
+})();
 
 /* ==========================================================================
    PRIVACY MODE (hide balance with dots)
@@ -1042,6 +1096,17 @@ function silverStats(p, gramPrice) {
   const targetHit = p.targetPrice > 0 && unitNow >= p.targetPrice;
   return { unitNow, cost, value, pl, plPct, targetHit };
 }
+function budgetSpent(category, monthKey) {
+  return Store.state.transactions
+    .filter(
+      (t) =>
+        t.type === "expense" &&
+        t.category === category &&
+        monthKeyOf(t.date) === monthKey,
+    )
+    .reduce((s, t) => s + t.amount, 0);
+}
+
 function totalsOf(monthKey) {
   const list = txOfMonth(monthKey);
   const income = list
@@ -1396,25 +1461,44 @@ function renderExpenseChart(list) {
   rows.forEach(([cat, amt], i) => {
     const pct = (amt / total) * 100;
     const color = CHART_PALETTE[i % CHART_PALETTE.length];
-    const item = el("div", { class: "bar-item" });
+    const limit = Store.state.budgets?.[cat] || 0;
+    const overBudget = limit > 0 && amt > limit;
+    const budgetPct = limit > 0 ? (amt / limit) * 100 : 0;
+
+    const item = el("div", {
+      class: `bar-item${overBudget ? " over-budget" : ""}`,
+    });
     const name = el("div", { class: "name" });
     name.appendChild(
       el("span", { class: "dot", style: `background:${color}` }),
     );
     name.appendChild(el("span", {}, cat));
+    if (overBudget)
+      name.appendChild(el("span", { class: "over-pill" }, "aşıldı"));
     item.appendChild(name);
     item.appendChild(
-      el("span", { class: "meta" }, `${fmt.try(amt)} · ${pct.toFixed(0)}%`),
+      el(
+        "span",
+        { class: "meta" },
+        limit > 0
+          ? `${fmt.try(amt)} / ${fmt.try(limit)}`
+          : `${fmt.try(amt)} · ${pct.toFixed(0)}%`,
+      ),
     );
     const bar = el("div", { class: "bar" });
+    const fillPct = limit > 0 ? Math.min(100, budgetPct) : pct;
+    const fillBg =
+      overBudget && limit > 0
+        ? "linear-gradient(90deg, #ff7585, var(--neg))"
+        : color;
     const fill = el("i", {
-      style: `background:${color};width:0%`,
+      style: `background:${fillBg};width:0%`,
     });
     bar.appendChild(fill);
     item.appendChild(bar);
     bars.appendChild(item);
     requestAnimationFrame(() => {
-      fill.style.width = Math.max(2, pct) + "%";
+      fill.style.width = Math.max(2, fillPct) + "%";
     });
   });
 }
@@ -2014,6 +2098,26 @@ const TxSheet = (() => {
       s.settings.lastUsedCategory[type] = category;
     });
     Sheets.close("sheet-tx");
+    // Post-save budget check (only on expense)
+    if (type === "expense") {
+      const limit = Store.state.budgets?.[category] || 0;
+      if (limit > 0) {
+        const spent = budgetSpent(category, monthKeyOf(date));
+        if (spent > limit) {
+          Toast.show(
+            `${category}: ${fmt.try(spent)} / ${fmt.try(limit)} — limit aşıldı`,
+            "error",
+            { duration: 4000 },
+          );
+          Haptics.warning();
+        } else if (spent > limit * 0.9) {
+          Toast.show(
+            `${category}: limitin %${Math.round((spent / limit) * 100)}'ine ulaşıldı`,
+            "info",
+          );
+        }
+      }
+    }
   }
 
   async function remove() {
@@ -3135,6 +3239,7 @@ function init() {
   Confirm.bind();
   Prompt.bind();
   DatePicker.bind();
+  Budgets.bind();
 
   // Wrap native date inputs with custom pill
   ["#tx-date", "#pending-date", "#collect-date", "#silver-buy-date"].forEach(

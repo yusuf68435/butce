@@ -1296,6 +1296,22 @@ html[data-theme="dark"] .tab.active {
   width: 0%;
   transition: width 1s var(--ease-out);
 }
+.bar-item.over-budget .meta {
+  color: var(--neg);
+  font-weight: 700;
+}
+.bar-item .over-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-left: 6px;
+  background: var(--neg-bg);
+  color: var(--neg);
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 
 /* ============ WEALTH PANEL ============ */
 .wealth {
@@ -2034,6 +2050,57 @@ html[data-theme="dark"] .chip.active {
 }
 .settings-row .ic.csv {
   background: linear-gradient(135deg, #b07bff, #7e4dff);
+}
+.settings-row .ic.budget {
+  background: linear-gradient(135deg, #4fb3ff, #38c97e);
+}
+
+/* Budget editor */
+.budget-hint {
+  font-size: 13px;
+  color: var(--fg-2);
+  padding: 6px 4px 14px;
+  line-height: 1.45;
+}
+.budget-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 130px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-2);
+}
+.budget-row + .budget-row {
+  border-top: 1px solid var(--hairline);
+}
+.budget-row .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.budget-row .label {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.budget-row .input {
+  font-size: 15px;
+  padding: 8px 10px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-2);
+  width: 100%;
+}
+.budget-row .input:focus {
+  outline: none;
+  border-color: var(--neon-1);
+  box-shadow: 0 0 0 3px var(--neon-soft);
 }
 .settings-row .ic.theme {
   background: linear-gradient(135deg, #6e8fa6, #2c3040);
