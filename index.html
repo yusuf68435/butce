@@ -45,7 +45,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=24" />
+    <link rel="stylesheet" href="style.css?v=25" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -84,7 +84,9 @@
                   data-icon="wallet"
                   aria-hidden="true"
                 ></span>
-                <div class="hero-eyebrow">Bu Ay Bakiye</div>
+                <div class="hero-eyebrow" data-i18n="hero.cash.eyebrow">
+                  Bu Ay Bakiye
+                </div>
                 <div
                   class="hero-amount"
                   id="cash-amount"
@@ -106,9 +108,13 @@
             </div>
 
             <section class="section">
-              <div class="section-title">Toplam Servet</div>
+              <div class="section-title" data-i18n="section.wealth">
+                Toplam Servet
+              </div>
               <div class="wealth" id="wealth-card">
-                <div class="wealth-eyebrow">Toplam</div>
+                <div class="wealth-eyebrow" data-i18n="wealth.total">
+                  Toplam
+                </div>
                 <div class="wealth-amount" id="wealth-amount">
                   <span class="currency">₺</span><span class="int">0</span>
                 </div>
@@ -122,7 +128,9 @@
             </section>
 
             <section class="section" id="trend-section">
-              <div class="section-title">Son 6 Ay Trendi</div>
+              <div class="section-title" data-i18n="section.trend">
+                Son 6 Ay Trendi
+              </div>
               <div class="trend-card">
                 <div class="trend-meta" id="trend-meta"></div>
                 <div class="trend-chart" id="trend-chart"></div>
@@ -130,7 +138,9 @@
             </section>
 
             <section class="section" id="expense-section">
-              <div class="section-title">Gider Dağılımı</div>
+              <div class="section-title" data-i18n="section.expenses">
+                Gider Dağılımı
+              </div>
               <div class="chart-card">
                 <div class="donut" id="expense-donut"></div>
                 <div class="bar-list" id="expense-bars"></div>
@@ -138,7 +148,9 @@
             </section>
 
             <section class="section">
-              <div class="section-title">Hareketler</div>
+              <div class="section-title" data-i18n="section.transactions">
+                Hareketler
+              </div>
               <div class="card" id="tx-list"></div>
             </section>
           </section>
@@ -156,7 +168,9 @@
                   data-icon="hourglass"
                   aria-hidden="true"
                 ></span>
-                <div class="hero-eyebrow">Toplam Beklenen</div>
+                <div class="hero-eyebrow" data-i18n="hero.pending.eyebrow">
+                  Toplam Beklenen
+                </div>
                 <div
                   class="hero-amount"
                   id="pending-amount"
@@ -171,7 +185,9 @@
             </div>
 
             <section class="section">
-              <div class="section-title">Tahsilatlar</div>
+              <div class="section-title" data-i18n="section.collections">
+                Tahsilatlar
+              </div>
               <div class="card" id="pending-list"></div>
             </section>
           </section>
@@ -189,7 +205,9 @@
                   data-icon="diamond"
                   aria-hidden="true"
                 ></span>
-                <div class="hero-eyebrow">Güncel Değer</div>
+                <div class="hero-eyebrow" data-i18n="hero.silver.eyebrow">
+                  Güncel Değer
+                </div>
                 <div
                   class="hero-amount"
                   id="silver-amount"
@@ -204,7 +222,9 @@
             </div>
 
             <section class="section">
-              <div class="section-title">Gram Fiyatı</div>
+              <div class="section-title" data-i18n="section.gramPrice">
+                Gram Fiyatı
+              </div>
               <div class="price-card">
                 <input
                   type="text"
@@ -213,13 +233,21 @@
                   placeholder="0"
                 />
                 <span class="unit">₺/gr</span>
-                <button class="pull-btn" id="fetch-price-btn">Çek</button>
+                <button
+                  class="pull-btn"
+                  id="fetch-price-btn"
+                  data-i18n="btn.fetch"
+                >
+                  Çek
+                </button>
               </div>
               <div class="price-hint" id="price-meta"></div>
             </section>
 
             <section class="section">
-              <div class="section-title">Pozisyonlar</div>
+              <div class="section-title" data-i18n="section.positions">
+                Pozisyonlar
+              </div>
               <div class="card" id="silver-list"></div>
             </section>
           </section>
@@ -243,7 +271,7 @@
             aria-selected="true"
           >
             <span data-icon="cash"></span>
-            <span>Nakit</span>
+            <span data-i18n="tab.cash">Nakit</span>
           </button>
           <button
             class="tab"
@@ -252,7 +280,7 @@
             aria-selected="false"
           >
             <span data-icon="hourglass"></span>
-            <span>Bekleyen</span>
+            <span data-i18n="tab.pending">Bekleyen</span>
           </button>
           <button
             class="tab"
@@ -261,7 +289,7 @@
             aria-selected="false"
           >
             <span data-icon="diamond"></span>
-            <span>Gümüş</span>
+            <span data-i18n="tab.silver">Gümüş</span>
           </button>
         </nav>
       </div>
@@ -637,13 +665,27 @@
             >
               <div class="ic privacy" data-icon="eye"></div>
               <div>
-                <div class="label">Bakiyeyi Gizle</div>
+                <div class="label" data-i18n="settings.privacy">
+                  Bakiyeyi Gizle
+                </div>
                 <div class="sub" id="privacy-sub">
                   Tutarları yıldız (•••) olarak göster
                 </div>
               </div>
               <span class="switch" aria-hidden="true"></span>
             </button>
+            <div class="settings-row">
+              <div class="ic lang" data-icon="globe"></div>
+              <div>
+                <div class="label" data-i18n="settings.lang">Dil</div>
+                <div class="sub">TR / EN</div>
+              </div>
+              <div class="seg" style="--n: 2; min-width: 110px">
+                <span class="seg-thumb" id="lang-thumb"></span>
+                <button class="seg-opt" data-lang-opt="tr">TR</button>
+                <button class="seg-opt" data-lang-opt="en">EN</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -827,6 +869,6 @@
       </form>
     </div>
 
-    <script src="app.js?v=24" defer></script>
+    <script src="app.js?v=25" defer></script>
   </body>
 </html>

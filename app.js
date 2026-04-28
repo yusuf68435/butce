@@ -75,6 +75,9 @@ const ETA_OPTIONS = [
   { key: "3mPlus", label: "3 ay+" },
 ];
 const ETA_LABELS = Object.fromEntries(ETA_OPTIONS.map((o) => [o.key, o.label]));
+function etaLabel(key) {
+  return typeof t === "function" ? t("eta." + key) : ETA_LABELS[key] || key;
+}
 
 const SILVER_KIND_LABEL = { gram: "Gram", ounce: "Ons", fund: "Fon" };
 const SILVER_KIND_UNIT = { gram: "gr", ounce: "ons", fund: "adet" };
@@ -93,6 +96,275 @@ const CHART_PALETTE = [
 ];
 
 const PRICE_ENDPOINT = "https://finans.truncgil.com/today.json";
+
+/* ==========================================================================
+   i18n — TR/EN (compact dictionary, key-driven)
+   ========================================================================== */
+
+const I18N = {
+  tr: {
+    "tab.cash": "Nakit",
+    "tab.pending": "Bekleyen",
+    "tab.silver": "Gümüş",
+    "hero.cash.eyebrow": "Bu Ay Bakiye",
+    "hero.pending.eyebrow": "Toplam Beklenen",
+    "hero.silver.eyebrow": "Güncel Değer",
+    "section.wealth": "Toplam Servet",
+    "section.trend": "Son 6 Ay Trendi",
+    "section.expenses": "Gider Dağılımı",
+    "section.transactions": "Hareketler",
+    "section.collections": "Tahsilatlar",
+    "section.gramPrice": "Gram Fiyatı",
+    "section.positions": "Pozisyonlar",
+    "trend.delta": "Net Bakiye Değişimi",
+    "wealth.total": "Toplam",
+    "wealth.cash": "Nakit",
+    "wealth.pending": "Bekleyen",
+    "wealth.silver": "Gümüş",
+    "donut.total": "Toplam",
+    "empty.cash.title": "Bu ay hareket yok",
+    "empty.cash.sub": "Sağ üstteki + ile ekleyin",
+    "empty.pending.title": "Bekleyen tahsilat yok",
+    "empty.pending.sub": "Bekleyen ödemeleri sağ üstten ekleyin",
+    "empty.silver.title": "Pozisyon yok",
+    "empty.silver.sub": "Gram, ons veya fon pozisyonu ekleyin",
+    "btn.cancel": "İptal",
+    "btn.save": "Kaydet",
+    "btn.close": "Kapat",
+    "btn.thisMonth": "Bu Ay",
+    "btn.fetch": "Çek",
+    "btn.transfer": "Aktar",
+    "btn.delete": "Sil",
+    "btn.confirm": "Tamam",
+    "btn.add": "Ekle",
+    "btn.giveUp": "Vazgeç",
+    "title.newTx": "Yeni Hareket",
+    "title.tx": "Hareket",
+    "title.newPending": "Yeni Bekleyen",
+    "title.pending": "Bekleyen",
+    "title.collect": "Tahsilat Geldi",
+    "title.newPosition": "Yeni Pozisyon",
+    "title.position": "Pozisyon",
+    "title.month": "Ay Seç",
+    "title.settings": "Ayarlar",
+    "title.budgets": "Bütçe Limitleri",
+    "title.date": "Tarih Seç",
+    "field.amount": "Tutar",
+    "field.category": "Kategori",
+    "field.description": "Açıklama",
+    "field.date": "Tarih",
+    "field.source": "Kimden / Ne için",
+    "field.eta": "Zaman Tahmini",
+    "field.exactDate": "Kesin Tarih (opsiyonel)",
+    "field.incomeCategory": "Gelir Kategorisi",
+    "field.amountUnit": "Miktar",
+    "field.buyPrice": "Alış Birim Fiyatı",
+    "field.buyDate": "Alış Tarihi (opsiyonel)",
+    "field.currentPrice": "Güncel Birim Fiyatı",
+    "field.targetPrice": "Hedef Satış Fiyatı",
+    "settings.appearance": "Görünüm",
+    "settings.theme": "Tema",
+    "settings.themeAuto": "Sistem ile uyumlu",
+    "settings.themeLight": "Açık tema",
+    "settings.themeDark": "Koyu tema",
+    "settings.privacy": "Bakiyeyi Gizle",
+    "settings.privacyOff": "Tutarları yıldız (•••) olarak göster",
+    "settings.privacyOn": "Tutarlar gizli — dokunmak için tekrar aç",
+    "settings.budget": "Bütçe",
+    "settings.budgetLimits": "Kategori Limitleri",
+    "settings.budgetSub": "Aylık harcama limitleri belirle",
+    "settings.backup": "Yedekleme",
+    "settings.export": "Yedek İndir",
+    "settings.exportSub": "Tüm verilerin tek dosyada",
+    "settings.import": "Yedekten Yükle",
+    "settings.importSub": "Mevcut verinin üzerine yazılır",
+    "settings.csvImport": "CSV İçe Aktar",
+    "settings.danger": "Tehlikeli Bölge",
+    "settings.reset": "Tüm Veriyi Sil",
+    "settings.resetSub": "Bu işlem geri alınamaz",
+    "settings.lang": "Dil",
+    "toast.deleted": "Silindi",
+    "toast.txDeleted": "Hareket silindi",
+    "toast.pendingDeleted": "Bekleyen silindi",
+    "toast.positionDeleted": "Pozisyon silindi",
+    "toast.amountRequired": "Tutar gerekli",
+    "toast.categoryRequired": "Lütfen bir kategori seçin",
+    "toast.fundCurrentRequired":
+      "Fon pozisyonu için güncel birim fiyatı gerekli",
+    "toast.backupLoaded": "Yedek yüldendi",
+    "toast.invalidBackup": "Geçersiz yedek dosyası",
+    "toast.allDataDeleted": "Tüm veri silindi",
+    "toast.online": "Çevrimiçi",
+    "toast.offline": "Çevrimdışı — değişiklikler yerel kaydedilir",
+    "toast.silverPriceUpdated": "Gümüş fiyatı güncellendi",
+    "toast.newVersion": "Yeni sürüm hazır",
+    "toast.refresh": "Yenile",
+    "eta.unknown": "Belirsiz",
+    "eta.thisWeek": "Bu hafta",
+    "eta.thisMonth": "Bu ay",
+    "eta.1to3m": "1-3 ay",
+    "eta.3mPlus": "3 ay+",
+    "kind.gram": "Gram",
+    "kind.ounce": "Ons",
+    "kind.fund": "Fon",
+    "label.aged": "eskidi",
+    "label.collect": "Geldi · Aktar",
+    "label.targetReached": "✓ Hedefe ulaşıldı",
+    "numline.buy": "Alış",
+    "numline.now": "Şimdi",
+    "numline.target": "Hedef",
+  },
+  en: {
+    "tab.cash": "Cash",
+    "tab.pending": "Pending",
+    "tab.silver": "Silver",
+    "hero.cash.eyebrow": "This Month Balance",
+    "hero.pending.eyebrow": "Total Expected",
+    "hero.silver.eyebrow": "Current Value",
+    "section.wealth": "Total Wealth",
+    "section.trend": "Last 6 Months Trend",
+    "section.expenses": "Expense Breakdown",
+    "section.transactions": "Transactions",
+    "section.collections": "Collections",
+    "section.gramPrice": "Gram Price",
+    "section.positions": "Positions",
+    "trend.delta": "Net Balance Change",
+    "wealth.total": "Total",
+    "wealth.cash": "Cash",
+    "wealth.pending": "Pending",
+    "wealth.silver": "Silver",
+    "donut.total": "Total",
+    "empty.cash.title": "No transactions this month",
+    "empty.cash.sub": "Tap + at the top to add",
+    "empty.pending.title": "No pending collections",
+    "empty.pending.sub": "Add expected payments from the top",
+    "empty.silver.title": "No positions",
+    "empty.silver.sub": "Add gram, ounce or fund position",
+    "btn.cancel": "Cancel",
+    "btn.save": "Save",
+    "btn.close": "Close",
+    "btn.thisMonth": "This Month",
+    "btn.fetch": "Fetch",
+    "btn.transfer": "Transfer",
+    "btn.delete": "Delete",
+    "btn.confirm": "OK",
+    "btn.add": "Add",
+    "btn.giveUp": "Discard",
+    "title.newTx": "New Transaction",
+    "title.tx": "Transaction",
+    "title.newPending": "New Pending",
+    "title.pending": "Pending",
+    "title.collect": "Collection Received",
+    "title.newPosition": "New Position",
+    "title.position": "Position",
+    "title.month": "Pick Month",
+    "title.settings": "Settings",
+    "title.budgets": "Budget Limits",
+    "title.date": "Pick Date",
+    "field.amount": "Amount",
+    "field.category": "Category",
+    "field.description": "Description",
+    "field.date": "Date",
+    "field.source": "From / What for",
+    "field.eta": "Time Estimate",
+    "field.exactDate": "Exact Date (optional)",
+    "field.incomeCategory": "Income Category",
+    "field.amountUnit": "Quantity",
+    "field.buyPrice": "Buy Unit Price",
+    "field.buyDate": "Buy Date (optional)",
+    "field.currentPrice": "Current Unit Price",
+    "field.targetPrice": "Target Sell Price",
+    "settings.appearance": "Appearance",
+    "settings.theme": "Theme",
+    "settings.themeAuto": "Match system",
+    "settings.themeLight": "Light",
+    "settings.themeDark": "Dark",
+    "settings.privacy": "Hide Balance",
+    "settings.privacyOff": "Show amounts as dots (•••)",
+    "settings.privacyOn": "Amounts hidden — tap to reveal",
+    "settings.budget": "Budget",
+    "settings.budgetLimits": "Category Limits",
+    "settings.budgetSub": "Set monthly spending limits",
+    "settings.backup": "Backup",
+    "settings.export": "Download Backup",
+    "settings.exportSub": "All data in one file",
+    "settings.import": "Restore Backup",
+    "settings.importSub": "Overwrites current data",
+    "settings.csvImport": "Import CSV",
+    "settings.danger": "Danger Zone",
+    "settings.reset": "Delete All Data",
+    "settings.resetSub": "This cannot be undone",
+    "settings.lang": "Language",
+    "toast.deleted": "Deleted",
+    "toast.txDeleted": "Transaction deleted",
+    "toast.pendingDeleted": "Pending deleted",
+    "toast.positionDeleted": "Position deleted",
+    "toast.amountRequired": "Amount required",
+    "toast.categoryRequired": "Please select a category",
+    "toast.fundCurrentRequired": "Current unit price required for fund",
+    "toast.backupLoaded": "Backup loaded",
+    "toast.invalidBackup": "Invalid backup file",
+    "toast.allDataDeleted": "All data deleted",
+    "toast.online": "Online",
+    "toast.offline": "Offline — changes saved locally",
+    "toast.silverPriceUpdated": "Silver price updated",
+    "toast.newVersion": "New version available",
+    "toast.refresh": "Refresh",
+    "eta.unknown": "Unknown",
+    "eta.thisWeek": "This week",
+    "eta.thisMonth": "This month",
+    "eta.1to3m": "1-3 months",
+    "eta.3mPlus": "3 months+",
+    "kind.gram": "Gram",
+    "kind.ounce": "Ounce",
+    "kind.fund": "Fund",
+    "label.aged": "stale",
+    "label.collect": "Received · Transfer",
+    "label.targetReached": "✓ Target reached",
+    "numline.buy": "Buy",
+    "numline.now": "Now",
+    "numline.target": "Target",
+  },
+};
+
+const Lang = (() => {
+  const KEY = "ggai:lang";
+  function get() {
+    return (
+      localStorage.getItem(KEY) ||
+      (navigator.language?.startsWith("en") ? "en" : "tr")
+    );
+  }
+  function set(l) {
+    localStorage.setItem(KEY, l);
+    document.documentElement.lang = l;
+    apply();
+    if (typeof renderAll === "function") renderAll();
+  }
+  function apply() {
+    const l = get();
+    document.documentElement.lang = l;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.dataset.i18n;
+      const v = I18N[l]?.[key];
+      if (v) el.textContent = v;
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+      const key = el.dataset.i18nPlaceholder;
+      const v = I18N[l]?.[key];
+      if (v) el.placeholder = v;
+    });
+  }
+  function init() {
+    apply();
+  }
+  return { init, get, set, apply };
+})();
+
+function t(key) {
+  const l = Lang.get();
+  return I18N[l]?.[key] ?? I18N.tr[key] ?? key;
+}
 
 /* ==========================================================================
    ICONS
@@ -145,6 +417,8 @@ const ICONS = {
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
   "eye-off":
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.5 0 10 7 10 7-.6 1.2-1.4 2.3-2.4 3.3M6.5 6.5C3.4 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.3 4.3-.9M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  globe:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>',
 };
 
 function hydrateIcons(root = document) {
@@ -1068,8 +1342,7 @@ function switchTab(target) {
   const tabbar = $(".tabbar");
   if (tabbar) tabbar.dataset.active = target;
   // top-right add button + topbar title context
-  const titles = { cash: "Nakit", pending: "Bekleyen", silver: "Gümüş" };
-  $("#topbar-title").textContent = titles[target] || "";
+  $("#topbar-title").textContent = t("tab." + target) || "";
   updateStatusBarColor(target);
   renderAll();
 }
@@ -1300,7 +1573,7 @@ function drawDonut(rootEl, segments, totalLabel) {
       ${segHTML}
     </svg>
     <div class="donut-center">
-      <div class="label">Toplam</div>
+      <div class="label">${t("donut.total")}</div>
       <div class="value">${totalLabel}</div>
     </div>`;
 }
@@ -1510,7 +1783,7 @@ function renderTxList(list) {
 
   if (!list.length) {
     root.appendChild(
-      emptyEl("inbox", "Bu ay hareket yok", "Sağ üstteki + ile ekleyin"),
+      emptyEl("inbox", t("empty.cash.title"), t("empty.cash.sub")),
     );
     hydrateIcons(root);
     return;
@@ -1616,11 +1889,7 @@ function renderPending() {
 
   if (!list.length) {
     root.appendChild(
-      emptyEl(
-        "hourglass",
-        "Bekleyen tahsilat yok",
-        "Bekleyen ödemeleri sağ üstten ekleyin",
-      ),
+      emptyEl("hourglass", t("empty.pending.title"), t("empty.pending.sub")),
     );
     hydrateIcons(root);
     return;
@@ -1631,7 +1900,7 @@ function renderPending() {
     const aged = daysSince(p.createdAt) >= AGED_DAYS;
     const etaText = p.exactDate
       ? fmt.date(p.exactDate)
-      : ETA_LABELS[p.eta] || "Belirsiz";
+      : etaLabel(p.eta) || t("eta.unknown");
     const subParts = [etaText];
     if (p.createdAt) subParts.push(`${daysSince(p.createdAt)} gün önce`);
 
@@ -1651,7 +1920,9 @@ function renderPending() {
     const titleLine = el("div", { class: "pending-title-line" });
     titleLine.appendChild(el("div", { class: "row-title" }, p.source));
     if (aged)
-      titleLine.appendChild(el("span", { class: "badge-warn" }, "eskidi"));
+      titleLine.appendChild(
+        el("span", { class: "badge-warn" }, t("label.aged")),
+      );
     text.appendChild(titleLine);
     text.appendChild(el("div", { class: "row-sub" }, subParts.join(" · ")));
     row.appendChild(text);
@@ -1671,7 +1942,7 @@ function renderPending() {
             CollectSheet.open(p.id);
           },
         },
-        "Geldi · Aktar",
+        t("label.collect"),
       ),
     );
     row.appendChild(stack);
@@ -1734,11 +2005,7 @@ function renderSilverList(gramPrice) {
 
   if (!Store.state.silver.length) {
     root.appendChild(
-      emptyEl(
-        "diamond",
-        "Pozisyon yok",
-        "Gram, ons veya fon pozisyonu ekleyin",
-      ),
+      emptyEl("diamond", t("empty.silver.title"), t("empty.silver.sub")),
     );
     hydrateIcons(root);
     return;
@@ -1816,16 +2083,16 @@ function renderSilverList(gramPrice) {
       numline.appendChild(track);
 
       const labels = el("div", { class: "numline-labels" });
-      labels.appendChild(buildCol("Alış", fmt.try(buy)));
-      const nowCol = buildCol("Şimdi", fmt.try(now));
+      labels.appendChild(buildCol(t("numline.buy"), fmt.try(buy)));
+      const nowCol = buildCol(t("numline.now"), fmt.try(now));
       nowCol.classList.add("now");
       labels.appendChild(nowCol);
-      labels.appendChild(buildCol("Hedef", fmt.try(tgt)));
+      labels.appendChild(buildCol(t("numline.target"), fmt.try(tgt)));
       numline.appendChild(labels);
 
       if (s.targetHit) {
         numline.appendChild(
-          el("div", { class: "numline-target-hit" }, "✓ Hedefe ulaşıldı"),
+          el("div", { class: "numline-target-hit" }, t("label.targetReached")),
         );
       }
       wrap.appendChild(numline);
@@ -2695,6 +2962,14 @@ const Settings = (() => {
     const s = Store.state;
     meta.textContent = `Bütçe v1 · ${s.transactions.length} hareket · ${s.pending.length} bekleyen · ${s.silver.length} pozisyon`;
     Theme.syncThumb();
+    // Sync lang thumb + active
+    const cur = Lang.get();
+    const idx = ["tr", "en"].indexOf(cur);
+    const thumb = $("#lang-thumb");
+    if (thumb) thumb.style.transform = `translateX(${idx * 100}%)`;
+    $$("[data-lang-opt]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.langOpt === cur),
+    );
     Sheets.open("sheet-settings");
   }
   function exportData() {
@@ -2939,6 +3214,19 @@ const Settings = (() => {
     $("#reset-btn").addEventListener("click", reset);
     $$("[data-theme-opt]").forEach((b) => {
       b.addEventListener("click", () => Theme.apply(b.dataset.themeOpt));
+    });
+    $$("[data-lang-opt]").forEach((b) => {
+      b.addEventListener("click", () => {
+        Lang.set(b.dataset.langOpt);
+        // Sync segmented thumb
+        const cur = Lang.get();
+        const idx = ["tr", "en"].indexOf(cur);
+        const thumb = $("#lang-thumb");
+        if (thumb) thumb.style.transform = `translateX(${idx * 100}%)`;
+        $$("[data-lang-opt]").forEach((x) =>
+          x.classList.toggle("active", x.dataset.langOpt === cur),
+        );
+      });
     });
   }
   return { open, bind };
@@ -3205,6 +3493,7 @@ function autoLabelInputs() {
 
 function init() {
   Theme.init();
+  Lang.init();
   Privacy.init();
   hydrateIcons();
   autoLabelInputs();
