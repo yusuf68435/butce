@@ -45,7 +45,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
     />
-    <link rel="stylesheet" href="style.css?v=30" />
+    <link rel="stylesheet" href="style.css?v=31" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -59,12 +59,20 @@
             data-icon="settings"
           ></button>
           <h1 class="topbar-title" id="topbar-title">Nakit</h1>
-          <button
-            class="icon-btn accent"
-            id="header-add"
-            aria-label="Yeni"
-            data-icon="plus"
-          ></button>
+          <div class="topbar-actions">
+            <button
+              class="icon-btn"
+              id="open-search"
+              aria-label="Ara"
+              data-icon="search"
+            ></button>
+            <button
+              class="icon-btn accent"
+              id="header-add"
+              aria-label="Yeni"
+              data-icon="plus"
+            ></button>
+          </div>
         </header>
 
         <div class="ptr" id="ptr" aria-hidden="true">
@@ -1103,6 +1111,44 @@
       </form>
     </div>
 
+    <!-- Search palette sheet (Cmd+K / search button) -->
+    <div
+      class="sheet sheet-search"
+      id="sheet-search"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="search-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>İptal</button>
+        <h2 class="title" id="search-title" data-i18n="title.search">Ara</h2>
+        <span></span>
+      </header>
+      <div class="sheet-body search-body">
+        <div class="search-input-wrap">
+          <span
+            class="search-icon"
+            data-icon="search"
+            aria-hidden="true"
+          ></span>
+          <input
+            type="search"
+            id="search-input"
+            class="input search-input"
+            placeholder="Hareket ara..."
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Hareket arama"
+          />
+        </div>
+        <div class="search-meta" id="search-meta" data-i18n="search.hint">
+          Açıklama, kategori veya tutara göre ara
+        </div>
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
+
     <!-- Receipt viewer sheet (full-size photo) -->
     <div
       class="sheet receipt-viewer"
@@ -1128,6 +1174,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=30" defer></script>
+    <script src="app.js?v=31" defer></script>
   </body>
 </html>

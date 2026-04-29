@@ -2604,6 +2604,71 @@ html[data-theme="dark"] .confirm-btn.primary {
   background: var(--neon-2);
 }
 
+/* ========== Topbar actions group + search palette ========== */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  color: var(--fg-3);
+  pointer-events: none;
+}
+.search-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.search-input {
+  width: 100%;
+  padding-left: 38px !important;
+  font-size: 16px;
+}
+.search-input::-webkit-search-cancel-button {
+  display: none;
+}
+.search-meta {
+  font-size: 13px;
+  color: var(--fg-3);
+  padding: 0 4px;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+.search-results .row + .row {
+  border-top: 0.5px solid var(--hairline);
+}
+.search-results:empty {
+  display: none;
+}
+.search-mark {
+  background: rgba(126, 77, 255, 0.22);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
 /* ========== Heatmap (annual expense intensity) ========== */
 .heatmap-card {
   background: var(--bg-2);

@@ -225,6 +225,12 @@ const I18N = {
     "heatmap.empty": "Bu yıl gider yok",
     "heatmap.legend.less": "az",
     "heatmap.legend.more": "çok",
+    "title.search": "Ara",
+    "search.hint": "Açıklama, kategori veya tutara göre ara",
+    "search.placeholder": "Hareket ara...",
+    "search.empty": "Eşleşen hareket yok",
+    "search.tooMany": "{n} sonuç bulundu — ilk 50 gösteriliyor",
+    "search.count": "{n} sonuç",
     "notif.budgetTitle": "Bütçe Limiti Aşıldı",
     "notif.budgetOver": "limiti aştı",
     "title.newRecurring": "Yeni Tekrarlayan",
@@ -376,6 +382,12 @@ const I18N = {
     "heatmap.empty": "No expenses this year",
     "heatmap.legend.less": "less",
     "heatmap.legend.more": "more",
+    "title.search": "Search",
+    "search.hint": "Search by description, category or amount",
+    "search.placeholder": "Search transactions...",
+    "search.empty": "No matching transactions",
+    "search.tooMany": "{n} matches — showing first 50",
+    "search.count": "{n} matches",
     "notif.budgetTitle": "Budget Limit Exceeded",
     "notif.budgetOver": "over limit",
     "title.newRecurring": "New Recurring",
@@ -516,6 +528,8 @@ const ICONS = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m17 1 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
   paperclip:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.65 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.83l8.49-8.48"/></svg>',
+  search:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   camera:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3l2-3h8l2 3h3v12H3z"/><circle cx="12" cy="13" r="4"/></svg>',
 };
@@ -3068,6 +3082,170 @@ function setSegThumb(rootSelector, activeIndex) {
    TX SHEET
    ========================================================================== */
 
+/* ==========================================================================
+   SEARCH PALETTE — instant transaction search (Cmd+K / topbar button)
+   ========================================================================== */
+
+const SearchPalette = (() => {
+  const MAX_RESULTS = 50;
+
+  function open() {
+    const input = $("#search-input");
+    if (input) input.value = "";
+    render("");
+    Sheets.open("sheet-search", () => {
+      setTimeout(() => input?.focus(), 250);
+    });
+  }
+
+  function searchTransactions(query) {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) return [];
+    const list = Store.state.transactions;
+    const out = [];
+    for (const tx of list) {
+      const cat = (tx.category || "").toLowerCase();
+      const desc = (tx.description || "").toLowerCase();
+      const amt = String(Math.round(Number(tx.amount) || 0));
+      if (cat.includes(q) || desc.includes(q) || amt.includes(q)) {
+        out.push(tx);
+      }
+    }
+    out.sort(
+      (a, b) =>
+        (b.date || "").localeCompare(a.date || "") ||
+        (b.id || "").localeCompare(a.id || ""),
+    );
+    return out;
+  }
+
+  function highlight(text, q) {
+    if (!q || !text) return text || "";
+    const lower = String(text).toLowerCase();
+    const idx = lower.indexOf(q);
+    if (idx === -1) return text;
+    const wrap = document.createDocumentFragment();
+    wrap.appendChild(document.createTextNode(text.slice(0, idx)));
+    wrap.appendChild(
+      el("mark", { class: "search-mark" }, text.slice(idx, idx + q.length)),
+    );
+    wrap.appendChild(document.createTextNode(text.slice(idx + q.length)));
+    return wrap;
+  }
+
+  function render(query) {
+    const root = $("#search-results");
+    const meta = $("#search-meta");
+    if (!root) return;
+    clear(root);
+    const q = (query || "").toLowerCase().trim();
+
+    if (!q) {
+      if (meta) meta.textContent = t("search.hint");
+      return;
+    }
+
+    const matches = searchTransactions(q);
+
+    if (!matches.length) {
+      if (meta) meta.textContent = t("search.empty");
+      root.appendChild(emptyEl("search", t("search.empty"), ""));
+      hydrateIcons(root);
+      return;
+    }
+
+    if (meta) {
+      meta.textContent =
+        matches.length > MAX_RESULTS
+          ? t("search.tooMany").replace("{n}", String(matches.length))
+          : t("search.count").replace("{n}", String(matches.length));
+    }
+
+    const sliced = matches.slice(0, MAX_RESULTS);
+    for (const tx of sliced) {
+      const meta2 = categoryMeta(tx.category);
+      const sign = tx.type === "income" ? "+" : "−";
+      const sub = tx.description
+        ? `${tx.description} · ${fmt.date(tx.date)}`
+        : fmt.date(tx.date);
+
+      const row = el("button", {
+        class: "row tappable",
+        type: "button",
+        onclick: () => {
+          Sheets.close("sheet-search");
+          // Wait briefly so the close animation can settle, then open the editor
+          setTimeout(() => TxSheet.open(tx.id), 120);
+        },
+      });
+      row.appendChild(
+        el("span", {
+          class: `row-icon ${meta2.kind}`,
+          "data-icon": meta2.icon,
+        }),
+      );
+      const text = el("div", { class: "row-text" });
+      const titleNode = el("div", { class: "row-title" });
+      const hl = highlight(tx.category, q);
+      if (typeof hl === "string") titleNode.textContent = hl;
+      else titleNode.appendChild(hl);
+      text.appendChild(titleNode);
+
+      const subNode = el("div", { class: "row-sub" });
+      const subHl = highlight(sub, q);
+      if (typeof subHl === "string") subNode.textContent = subHl;
+      else subNode.appendChild(subHl);
+      text.appendChild(subNode);
+
+      row.appendChild(text);
+      row.appendChild(
+        el(
+          "div",
+          {
+            class: `row-amount ${tx.type === "income" ? "pos" : "neg"}`,
+          },
+          `${sign}${fmt.int(tx.amount).replace(/^-/, "")} ${currencyMeta().sym}`,
+        ),
+      );
+      root.appendChild(row);
+    }
+    hydrateIcons(root);
+  }
+
+  function bind() {
+    const btn = $("#open-search");
+    if (btn) btn.addEventListener("click", open);
+    const input = $("#search-input");
+    if (input) {
+      let debounceTimer = 0;
+      input.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => render(input.value), 80);
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          Sheets.close("sheet-search");
+        } else if (e.key === "Enter") {
+          // First result → open
+          const first = $("#search-results .row");
+          if (first) first.click();
+        }
+      });
+    }
+    // Cmd+K / Ctrl+K shortcut (skip if typing in another input)
+    document.addEventListener("keydown", (e) => {
+      const key = e.key?.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && key === "k") {
+        e.preventDefault();
+        if (Sheets.topId && Sheets.topId() === "sheet-search") return;
+        open();
+      }
+    });
+  }
+
+  return { open, bind, searchTransactions };
+})();
+
 const TxSheet = (() => {
   let editingId = null;
   let type = "expense";
@@ -4547,6 +4725,7 @@ function init() {
   DatePicker.bind();
   Budgets.bind();
   Recurring.bind();
+  SearchPalette.bind();
 
   // Apply any due recurring rules — startup only
   const applied = applyRecurringDue();
