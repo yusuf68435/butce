@@ -10,13 +10,16 @@ Kişisel finans takibi yapan, **sunucusuz, çevrimdışı çalışan** PWA. Tüm
 - **3 sekme**: Nakit (gelir/gider) · Bekleyen (tahsilat) · Gümüş (gram/ons/fon pozisyon)
 - iOS HIG uyumlu UI: gradient hero kart, donut grafik, sparkline, alış→şimdi→hedef numline
 - 3-wheel **Apple-tarzı tarih seçici**, drag-to-dismiss sheet'ler, FLIP animated reorder
-- Dark/Light/Auto tema, **bakiyeyi gizle** (privacy mode)
-- **Pull-to-refresh** (Gümüş sekmesinde fiyat çekimi)
-- **Haptic feedback** (Vibration API)
-- **CSV import** (`date,type,category,amount,description`)
-- JSON yedekleme (içe/dışa)
-- Çevrimdışı tam fonksiyonel (Service Worker)
-- WCAG AA (Lighthouse 100), SEO 100
+- Dark/Light/Auto tema, **TR/EN dil**, **bakiyeyi gizle** (privacy mode)
+- **Multi-currency**: TRY / USD / EUR — Frankfurter.app ile FX cache (offline-first, veri ₺ olarak saklanır)
+- **Aylık tekrarlayan işlemler** (otomatik kira/maaş/fatura)
+- **Kategori bütçe limitleri** + native `Notification API` uyarısı
+- **Fiş fotoğrafı**: IndexedDB blob storage, otomatik JPEG sıkıştırma, lazy thumbnail
+- **GitHub-tarzı yıllık ısı haritası** (gider yoğunluğu, quartile renk skalası)
+- **Cmd+K arama paleti** — kategori, açıklama, tutar; canlı debounce + highlight
+- **Pull-to-refresh** (Gümüş sekmesinde fiyat çekimi), **Haptic feedback** (Vibration API)
+- **CSV import** (`date,type,category,amount,description`), JSON yedekleme (içe/dışa)
+- Çevrimdışı tam fonksiyonel (Service Worker), WCAG AA (Lighthouse 100), SEO 100
 
 ## Çalıştırma (yerel)
 
@@ -79,13 +82,19 @@ git push -u origin main
 
 ```
 .
-├── index.html          # Tek sayfa, 3 sekme + 8 sheet
-├── style.css           # Token sistem, ~2200 satır
-├── app.js              # Modüler vanilla JS, ~2700 satır
+├── index.html          # Tek sayfa, 3 sekme + 11 sheet (~1100 satır)
+├── style.css           # Token sistem, ~2700 satır
+├── app.js              # Modüler vanilla JS IIFE, ~4500 satır
+│                       #   Store · FX · Photos (IDB) · Currency · Theme · Lang
+│                       #   Privacy · Sheets · Toast · Confirm · Prompt · DatePicker
+│                       #   TxSheet · PendingSheet · CollectSheet · SilverSheet
+│                       #   MonthPicker · Settings · Budgets · Recurring · SearchPalette
 ├── manifest.json       # PWA manifest (categories, shortcuts, maskable)
-├── service-worker.js   # Cache-first + update prompt
+├── service-worker.js   # Cache-first + update prompt (ggai-v32)
 └── tools/
-    └── capture.mjs     # Playwright 20-screenshot pipeline
+    ├── build.mjs       # terser + csso → dist/
+    ├── capture.mjs     # Playwright 20-screenshot pipeline
+    └── tests.mjs       # 19 unit tests, vm sandbox
 ```
 
 ## Geliştirme

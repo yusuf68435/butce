@@ -2,7 +2,15 @@
 // Usage: npm run build
 // Outputs: dist/index.html, dist/style.css, dist/app.js, manifest.json, service-worker.js
 
-import { mkdir, copyFile, readFile, writeFile, rm } from "node:fs/promises";
+import {
+  mkdir,
+  copyFile,
+  readFile,
+  writeFile,
+  rm,
+  readdir,
+  unlink,
+} from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { minify as minifyJS } from "terser";
@@ -13,7 +21,23 @@ const ROOT = resolve(__dirname, "..");
 const DIST = resolve(ROOT, "dist");
 
 async function build() {
-  await rm(DIST, { recursive: true, force: true });
+  // Some Windows static servers hold a file handle on dist/ — try rm first,
+  // fall back to clearing contents (which works while the dir handle is open).
+  try {
+    await rm(DIST, { recursive: true, force: true });
+  } catch (err) {
+    if (err.code !== "EBUSY") throw err;
+    const entries = await readdir(DIST).catch(() => []);
+    for (const name of entries) {
+      try {
+        await rm(resolve(DIST, name), { recursive: true, force: true });
+      } catch (e) {
+        if (e.code === "EBUSY" || e.code === "EPERM") {
+          await unlink(resolve(DIST, name)).catch(() => {});
+        } else throw e;
+      }
+    }
+  }
   await mkdir(DIST, { recursive: true });
 
   // CSS
