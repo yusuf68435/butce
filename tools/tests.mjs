@@ -145,6 +145,7 @@ const APP_PLUS_EXPORTS =
   Confirm, Prompt, DatePicker, Budgets, ETA_OPTIONS, ETA_LABELS,
   CATEGORY_META, CHART_PALETTE, OUNCE_TO_GRAM,
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
+  SearchPalette, dailyExpenseHeatmap,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -307,6 +308,82 @@ test("fmt.try uses display currency symbol", () => {
   sandbox.Store.update((s) => {
     s.settings.currency = "TRY";
   });
+});
+
+test("SearchPalette.searchTransactions: matches category, description, amount", () => {
+  sandbox.Store.update((s) => {
+    s.transactions = [
+      {
+        id: "a",
+        type: "expense",
+        category: "Market",
+        amount: 1500,
+        description: "Migros haftalık",
+        date: "2026-04-25",
+      },
+      {
+        id: "b",
+        type: "expense",
+        category: "Yakıt/Ulaşım",
+        amount: 800,
+        description: "Shell benzin",
+        date: "2026-04-24",
+      },
+      {
+        id: "c",
+        type: "income",
+        category: "Maaş/Proje",
+        amount: 50000,
+        description: "Nisan maaşı",
+        date: "2026-04-01",
+      },
+    ];
+  });
+  const byCategory = sandbox.SearchPalette.searchTransactions("market");
+  assert.equal(byCategory.length, 1);
+  assert.equal(byCategory[0].id, "a");
+
+  const byDescription = sandbox.SearchPalette.searchTransactions("benzin");
+  assert.equal(byDescription.length, 1);
+  assert.equal(byDescription[0].id, "b");
+
+  const byAmount = sandbox.SearchPalette.searchTransactions("50000");
+  assert.equal(byAmount.length, 1);
+  assert.equal(byAmount[0].id, "c");
+
+  const empty = sandbox.SearchPalette.searchTransactions("xyz123");
+  assert.equal(empty.length, 0);
+
+  const blank = sandbox.SearchPalette.searchTransactions("");
+  assert.equal(blank.length, 0);
+});
+
+test("SearchPalette: sorted by date desc", () => {
+  // (uses transactions seeded above)
+  const all = sandbox.SearchPalette.searchTransactions("a"); // matches everything
+  // Ensure date order: 2026-04-25 > 2026-04-24 > 2026-04-01
+  assert.equal(all[0].date >= all[1].date, true);
+  assert.equal(all[1].date >= all[2].date, true);
+});
+
+test("dailyExpenseHeatmap: aggregates expenses, ignores income, computes max", () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const ya = new Date();
+  ya.setDate(ya.getDate() - 400);
+  const tooOld = ya.toISOString().slice(0, 10);
+  sandbox.Store.update((s) => {
+    s.transactions = [
+      { id: "1", type: "expense", category: "X", amount: 100, date: today },
+      { id: "2", type: "expense", category: "Y", amount: 250, date: today }, // same day
+      { id: "3", type: "income", category: "Z", amount: 9999, date: today }, // ignored
+      { id: "4", type: "expense", category: "X", amount: 50, date: tooOld }, // ignored: > 365 days ago
+    ];
+  });
+  const h = sandbox.dailyExpenseHeatmap();
+  assert.equal(h.byDate[today], 350);
+  assert.equal(h.total, 350);
+  assert.equal(h.days, 1);
+  assert.equal(h.max, 350);
 });
 
 // Run
