@@ -4727,14 +4727,14 @@ function init() {
   Recurring.bind();
   SearchPalette.bind();
 
-  // Apply any due recurring rules — startup only
-  const applied = applyRecurringDue();
-  if (applied > 0) {
-    setTimeout(
-      () => Toast.show(`${applied} ${t("toast.recurringApplied")}`, "success"),
-      400,
-    );
-  }
+  // Apply any due recurring rules — defer to idle so it doesn't block first paint
+  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 200));
+  idle(() => {
+    const applied = applyRecurringDue();
+    if (applied > 0) {
+      Toast.show(`${applied} ${t("toast.recurringApplied")}`, "success");
+    }
+  });
 
   // Wrap native date inputs with custom pill
   ["#tx-date", "#pending-date", "#collect-date", "#silver-buy-date"].forEach(

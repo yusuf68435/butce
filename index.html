@@ -41,11 +41,21 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Async font load: print stylesheet then promote to all on load (non-blocking) -->
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      onload="this.rel = 'stylesheet'"
     />
-    <link rel="stylesheet" href="style.css?v=31" />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
+    <link rel="stylesheet" href="style.css?v=32" />
+    <link rel="preload" as="script" href="app.js?v=32" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -1174,6 +1184,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=31" defer></script>
+    <script src="app.js?v=32" defer></script>
   </body>
 </html>
