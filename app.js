@@ -755,8 +755,16 @@ const fmt = {
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
+// Local YYYY-MM-DD (matches what <input type="date"> emits in the user's TZ).
+// toISOString() is UTC-based and produces off-by-one near midnight east of UTC.
+function localISO(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localISO(new Date());
 }
 function currentMonthKey() {
   const d = new Date();
@@ -1267,15 +1275,31 @@ async function compressImage(file, maxW = 1280, quality = 0.85) {
 
 // Lazy-load a thumbnail. Uses IntersectionObserver when available so off-screen
 // rows don't decode immediately; falls back to direct load otherwise.
+//
+// Memory safety: every blob URL we create is revoked on either `load` OR
+// `error`, so we never leak when an <img> is detached before it decodes
+// (rapid re-renders, search, swipe-delete). We also tag the element with
+// `_thumbUrl` so a second lazy-load on the same element revokes its predecessor.
 function lazyLoadThumb(imgEl, photoId) {
   if (!imgEl || !photoId) return;
   function load() {
     Photos.get(photoId).then((blob) => {
       if (!blob) return;
+      // Revoke any stale URL still attached to this <img>
+      if (imgEl._thumbUrl) {
+        URL.revokeObjectURL(imgEl._thumbUrl);
+        imgEl._thumbUrl = null;
+      }
       const u = URL.createObjectURL(blob);
-      imgEl.addEventListener("load", () => URL.revokeObjectURL(u), {
-        once: true,
-      });
+      imgEl._thumbUrl = u;
+      const cleanup = () => {
+        if (imgEl._thumbUrl === u) {
+          URL.revokeObjectURL(u);
+          imgEl._thumbUrl = null;
+        }
+      };
+      imgEl.addEventListener("load", cleanup, { once: true });
+      imgEl.addEventListener("error", cleanup, { once: true });
       imgEl.src = u;
     });
   }
@@ -2332,7 +2356,7 @@ function dailyExpenseHeatmap() {
   const today = new Date();
   const cutoff = new Date(today);
   cutoff.setDate(today.getDate() - 365);
-  const cutoffIso = cutoff.toISOString().slice(0, 10);
+  const cutoffIso = localISO(cutoff);
   let total = 0;
   let days = 0;
   let max = 0;
@@ -2399,7 +2423,7 @@ function renderHeatmap() {
         grid.appendChild(cell);
         continue;
       }
-      const iso = dt.toISOString().slice(0, 10);
+      const iso = localISO(dt);
       const amt = byDate[iso] || 0;
       const lvl = levelOf(amt);
       // role="img" with aria-label keeps the cell informational for screen
@@ -3356,14 +3380,28 @@ const TxSheet = (() => {
     renderReceipt();
   }
 
-  function viewPhoto() {
+  let _viewerUrl = null;
+  function setViewerSrc(blob) {
     const img = $("#receipt-viewer-img");
-    if (!img) return;
+    if (!img || !blob) return;
+    if (_viewerUrl) URL.revokeObjectURL(_viewerUrl);
+    _viewerUrl = URL.createObjectURL(blob);
+    img.src = _viewerUrl;
+  }
+  function clearViewerSrc() {
+    const img = $("#receipt-viewer-img");
+    if (_viewerUrl) {
+      URL.revokeObjectURL(_viewerUrl);
+      _viewerUrl = null;
+    }
+    if (img) img.removeAttribute("src");
+  }
+  function viewPhoto() {
     if (pendingBlob) {
-      img.src = URL.createObjectURL(pendingBlob);
+      setViewerSrc(pendingBlob);
     } else if (currentPhotoId) {
       Photos.get(currentPhotoId).then((blob) => {
-        if (blob) img.src = URL.createObjectURL(blob);
+        if (blob) setViewerSrc(blob);
       });
     } else {
       return;
@@ -3428,93 +3466,108 @@ const TxSheet = (() => {
     );
   }
 
+  let _saveInFlight = false;
   async function save() {
-    const amount = parseAmount($("#tx-amount").value);
-    if (!amount || amount <= 0) {
-      $("#tx-amount").focus();
-      Toast.show("Tutar gerekli", "error");
-      return;
-    }
-    if (!category) {
-      Toast.show("Lütfen bir kategori seçin", "error");
-      return;
-    }
-    const date = $("#tx-date").value || todayISO();
-    const description = $("#tx-desc").value.trim();
-
-    // Resolve photoId: keep, replace, or remove
-    let photoId = currentPhotoId;
-    if (pendingBlob) {
-      try {
-        const newId = await Photos.add(pendingBlob);
-        // Replace: remove old photo
-        if (currentPhotoId && currentPhotoId !== newId) {
-          await Photos.remove(currentPhotoId);
-        }
-        photoId = newId;
-      } catch {
-        Toast.show(t("toast.photoFailed"), "error");
+    if (_saveInFlight) return; // double-tap guard
+    _saveInFlight = true;
+    try {
+      const amount = parseAmount($("#tx-amount").value);
+      if (!amount || amount <= 0) {
+        $("#tx-amount").focus();
+        Toast.show("Tutar gerekli", "error");
         return;
       }
-    } else if (pendingRemove && currentPhotoId) {
-      await Photos.remove(currentPhotoId);
-      photoId = null;
-    }
+      if (!category) {
+        Toast.show("Lütfen bir kategori seçin", "error");
+        return;
+      }
+      const date = $("#tx-date").value || todayISO();
+      const description = $("#tx-desc").value.trim();
 
-    Store.update((s) => {
-      if (editingId) {
-        const tr = s.transactions.find((x) => x.id === editingId);
-        if (tr)
-          Object.assign(tr, {
+      // Resolve the new photoId BEFORE writing the store. If the write fails
+      // halfway through, it's safer to orphan a blob (cleanable later) than
+      // to leave the tx pointing at a deleted photoId.
+      let nextPhotoId = currentPhotoId;
+      let oldIdToCleanup = null;
+      if (pendingBlob) {
+        try {
+          nextPhotoId = await Photos.add(pendingBlob);
+          if (currentPhotoId && currentPhotoId !== nextPhotoId) {
+            oldIdToCleanup = currentPhotoId;
+          }
+        } catch {
+          Toast.show(t("toast.photoFailed"), "error");
+          return;
+        }
+      } else if (pendingRemove && currentPhotoId) {
+        oldIdToCleanup = currentPhotoId;
+        nextPhotoId = null;
+      }
+
+      Store.update((s) => {
+        if (editingId) {
+          const tr = s.transactions.find((x) => x.id === editingId);
+          if (tr) {
+            Object.assign(tr, {
+              type,
+              category,
+              amount,
+              description,
+              date,
+              photoId: nextPhotoId || undefined,
+            });
+            if (!nextPhotoId) delete tr.photoId;
+          }
+        } else {
+          const tx = {
+            id: uid(),
             type,
             category,
             amount,
             description,
             date,
-            photoId: photoId || undefined,
-          });
-        if (tr && !photoId) delete tr.photoId;
-      } else {
-        const tx = {
-          id: uid(),
-          type,
-          category,
-          amount,
-          description,
-          date,
-        };
-        if (photoId) tx.photoId = photoId;
-        s.transactions.push(tx);
-      }
-      s.settings.lastUsedCategory = s.settings.lastUsedCategory || {};
-      s.settings.lastUsedCategory[type] = category;
-    });
-    Sheets.close("sheet-tx");
-    // Post-save budget check (only on expense)
-    if (type === "expense") {
-      const limit = Store.state.budgets?.[category] || 0;
-      if (limit > 0) {
-        const spent = budgetSpent(category, monthKeyOf(date));
-        const overshoot = spent - limit;
-        if (spent > limit) {
-          Toast.show(
-            `${category}: ${fmt.try(spent)} / ${fmt.try(limit)} — limit aşıldı`,
-            "error",
-            { duration: 4000 },
-          );
-          Haptics.warning();
-          Notifier.send(
-            t("notif.budgetTitle"),
-            `${category}: ${fmt.try(overshoot)} ${t("notif.budgetOver")}`,
-            { tag: "budget-" + category },
-          );
-        } else if (spent > limit * 0.9) {
-          Toast.show(
-            `${category}: limitin %${Math.round((spent / limit) * 100)}'ine ulaşıldı`,
-            "info",
-          );
+          };
+          if (nextPhotoId) tx.photoId = nextPhotoId;
+          s.transactions.push(tx);
+        }
+        s.settings.lastUsedCategory = s.settings.lastUsedCategory || {};
+        s.settings.lastUsedCategory[type] = category;
+      });
+
+      // Now that the store is durably updated, drop the old photo blob.
+      // If this fails, the orphan is harmless — the tx no longer references it.
+      if (oldIdToCleanup) Photos.remove(oldIdToCleanup);
+
+      Sheets.close("sheet-tx");
+
+      // Post-save budget check (only on expense)
+      if (type === "expense") {
+        const limit = Store.state.budgets?.[category] || 0;
+        if (limit > 0) {
+          const spent = budgetSpent(category, monthKeyOf(date));
+          const overshoot = spent - limit;
+          if (spent > limit) {
+            Toast.show(
+              `${category}: ${fmt.try(spent)} / ${fmt.try(limit)} — limit aşıldı`,
+              "error",
+              { duration: 4000 },
+            );
+            Haptics.warning();
+            Notifier.send(
+              t("notif.budgetTitle"),
+              `${category}: ${fmt.try(overshoot)} ${t("notif.budgetOver")}`,
+              { tag: "budget-" + category },
+            );
+          } else if (spent > limit * 0.9) {
+            Toast.show(
+              `${category}: limitin %${Math.round((spent / limit) * 100)}'ine ulaşıldı`,
+              "info",
+            );
+          }
         }
       }
+    } finally {
+      _saveInFlight = false;
     }
   }
 
@@ -3550,6 +3603,16 @@ const TxSheet = (() => {
     if (rm) rm.addEventListener("click", removePhoto);
     const thumb = $("#receipt-thumb");
     if (thumb) thumb.addEventListener("click", viewPhoto);
+    // Revoke the viewer's blob URL when its sheet closes
+    const viewerSheet = $("#sheet-receipt");
+    if (viewerSheet) {
+      new MutationObserver(() => {
+        if (!viewerSheet.classList.contains("open")) clearViewerSrc();
+      }).observe(viewerSheet, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
     $$("[data-tx-type]", $("#sheet-tx")).forEach((b) => {
       b.addEventListener("click", () => {
         type = b.dataset.txType;

@@ -2724,14 +2724,10 @@ html[data-theme="dark"] .confirm-btn.primary {
   background: var(--bg-3, #2b2f3a);
   border: 0;
   padding: 0;
-  cursor: pointer;
-  transition:
-    transform 0.12s ease,
-    outline-color 0.12s ease;
+  transition: transform 0.12s ease;
 }
 .hm-cell.hm-empty {
   background: transparent;
-  cursor: default;
   pointer-events: none;
 }
 .hm-cell[data-level="0"] {
@@ -2758,10 +2754,6 @@ html[data-theme="dark"] .hm-cell[data-level="0"] {
 }
 .hm-cell:hover:not(.hm-empty) {
   transform: scale(1.35);
-}
-.hm-cell:focus-visible {
-  outline: 2px solid var(--neon, #7e4dff);
-  outline-offset: 1px;
 }
 .heatmap-legend {
   display: flex;

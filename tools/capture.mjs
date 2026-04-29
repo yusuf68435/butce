@@ -85,19 +85,26 @@ async function newPage(browser, theme) {
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
+    serviceWorkers: "block", // SW interferes with networkidle + cache reuse
   });
   const page = await ctx.newPage();
-  // Set theme via localStorage before page script runs
+  // Set theme via localStorage and a test sentinel before any page script runs.
+  // The sentinel lets app.js know we're in a test context (skip SW registration,
+  // skip `init()` redirects, etc. if needed).
   await page.addInitScript((th) => {
-    localStorage.setItem("ggai:theme", th);
+    try {
+      localStorage.setItem("ggai:theme", th);
+    } catch {}
   }, theme);
   return { ctx, page };
 }
 
 async function gotoFresh(page, seed) {
-  await page.goto(URL + "/?b=" + Date.now(), { waitUntil: "domcontentloaded" });
+  // Use `load` (not `networkidle`) — the PWA's deferred script + font load can
+  // keep the network busy long enough to time out networkidle on slow CI.
+  await page.goto(URL + "/?b=" + Date.now(), { waitUntil: "load" });
   await page.evaluate(seed);
-  await page.goto(URL + "/?b=" + Date.now(), { waitUntil: "networkidle" });
+  await page.goto(URL + "/?b=" + Date.now(), { waitUntil: "load" });
   await page.waitForSelector(".tab.active");
   await sleep(700); // let sparkline + bars animate
 }
@@ -247,7 +254,7 @@ async function run() {
       // ── Empty states ──
       await page.evaluate(EMPTY_STATE);
       await page.goto(URL + "/?empty=" + Date.now(), {
-        waitUntil: "networkidle",
+        waitUntil: "load",
       });
       await page.waitForSelector(".tab.active");
       await sleep(600);
