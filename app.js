@@ -221,6 +221,10 @@ const I18N = {
     "toast.photoRemoved": "Fiş kaldırıldı",
     "toast.photoTooLarge": "Fotoğraf çok büyük — sıkıştırılamadı",
     "toast.photoFailed": "Fotoğraf yüklenemedi",
+    "section.heatmap": "Yıllık Yoğunluk",
+    "heatmap.empty": "Bu yıl gider yok",
+    "heatmap.legend.less": "az",
+    "heatmap.legend.more": "çok",
     "notif.budgetTitle": "Bütçe Limiti Aşıldı",
     "notif.budgetOver": "limiti aştı",
     "title.newRecurring": "Yeni Tekrarlayan",
@@ -368,6 +372,10 @@ const I18N = {
     "toast.photoRemoved": "Receipt removed",
     "toast.photoTooLarge": "Photo too large — could not compress",
     "toast.photoFailed": "Could not load photo",
+    "section.heatmap": "Annual Heatmap",
+    "heatmap.empty": "No expenses this year",
+    "heatmap.legend.less": "less",
+    "heatmap.legend.more": "more",
     "notif.budgetTitle": "Budget Limit Exceeded",
     "notif.budgetOver": "over limit",
     "title.newRecurring": "New Recurring",
@@ -2253,6 +2261,7 @@ function renderCash() {
 
   renderWealth();
   renderTrend();
+  renderHeatmap();
   renderExpenseChart(t.list);
   renderTxList(t.list);
 }
@@ -2298,6 +2307,145 @@ function renderTrend() {
     });
   });
 }
+
+/* ==========================================================================
+   HEATMAP — GitHub-style annual expense intensity grid
+   ========================================================================== */
+
+// Returns { byDate: { ISO: amount }, total, days, max }
+function dailyExpenseHeatmap() {
+  const byDate = Object.create(null);
+  const today = new Date();
+  const cutoff = new Date(today);
+  cutoff.setDate(today.getDate() - 365);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+  let total = 0;
+  let days = 0;
+  let max = 0;
+  for (const t of Store.state.transactions) {
+    if (t.type !== "expense" || !t.date) continue;
+    if (t.date < cutoffIso) continue;
+    const prev = byDate[t.date] || 0;
+    if (prev === 0) days++;
+    const next = prev + (Number(t.amount) || 0);
+    byDate[t.date] = next;
+    total += Number(t.amount) || 0;
+    if (next > max) max = next;
+  }
+  return { byDate, total, days, max };
+}
+
+function renderHeatmap() {
+  const grid = $("#heatmap-grid");
+  const months = $("#heatmap-months");
+  const meta = $("#heatmap-meta");
+  if (!grid) return;
+  clear(grid);
+  clear(months);
+
+  const { byDate, total, days, max } = dailyExpenseHeatmap();
+
+  // Quartile thresholds for non-zero amounts
+  const sorted = Object.values(byDate)
+    .filter((v) => v > 0)
+    .sort((a, b) => a - b);
+  const q = (p) => sorted[Math.max(0, Math.floor(sorted.length * p) - 1)] || 0;
+  const q1 = q(0.25);
+  const q2 = q(0.5);
+  const q3 = q(0.75);
+  function levelOf(v) {
+    if (!v) return 0;
+    if (v <= q1) return 1;
+    if (v <= q2) return 2;
+    if (v <= q3) return 3;
+    return 4;
+  }
+
+  // Build the day grid: column-by-column, week-aligned to Monday start.
+  const today = new Date();
+  // Start: 52 weeks ago, snapped back to Monday
+  const start = new Date(today);
+  start.setDate(today.getDate() - 7 * 52);
+  // JS getDay(): 0=Sun..6=Sat; we want Monday=0
+  const dow = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - dow);
+
+  const monthLabels = []; // { col, label }
+  let lastMonth = -1;
+  let totalCols = 0;
+
+  const weeks = 53;
+  for (let w = 0; w < weeks; w++) {
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(start);
+      dt.setDate(start.getDate() + w * 7 + d);
+      if (dt > today) {
+        // Empty placeholder cell to keep the grid rectangular
+        const cell = el("div", { class: "hm-cell hm-empty" });
+        grid.appendChild(cell);
+        continue;
+      }
+      const iso = dt.toISOString().slice(0, 10);
+      const amt = byDate[iso] || 0;
+      const lvl = levelOf(amt);
+      const cell = el("button", {
+        type: "button",
+        class: `hm-cell`,
+        "data-level": String(lvl),
+        "data-date": iso,
+        "data-amount": String(amt),
+        "aria-label": amt
+          ? `${fmt.date(iso)} · ${fmt.try(amt)}`
+          : `${fmt.date(iso)}`,
+        title: amt ? `${fmt.date(iso)} · ${fmt.try(amt)}` : fmt.date(iso),
+      });
+      grid.appendChild(cell);
+    }
+    // Determine month label for this column based on the first day of the week
+    const colStart = new Date(start);
+    colStart.setDate(start.getDate() + w * 7);
+    if (colStart <= today) {
+      const m = colStart.getMonth();
+      if (m !== lastMonth) {
+        monthLabels.push({ col: w, label: TR_MONTHS_SHORT[m] });
+        lastMonth = m;
+      }
+      totalCols = w + 1;
+    }
+  }
+
+  for (const ml of monthLabels) {
+    const lab = el(
+      "span",
+      {
+        class: "hm-month",
+        style: `grid-column-start: ${ml.col + 1}`,
+      },
+      ml.label,
+    );
+    months.appendChild(lab);
+  }
+  months.style.setProperty("--hm-cols", String(weeks));
+
+  if (meta) {
+    if (!total) {
+      meta.textContent = t("heatmap.empty");
+    } else {
+      meta.textContent = `${days} gün · ${fmt.try(total)}`;
+    }
+  }
+}
+
+// Tap any heatmap cell — show a brief toast with the date and amount
+document.addEventListener("click", (e) => {
+  const cell = e.target.closest && e.target.closest(".hm-cell");
+  if (!cell || !cell.dataset.date) return;
+  const amt = Number(cell.dataset.amount) || 0;
+  const msg = amt
+    ? `${fmt.date(cell.dataset.date)} · ${fmt.try(amt)}`
+    : `${fmt.date(cell.dataset.date)} — ${t("heatmap.empty").toLowerCase()}`;
+  if (typeof Toast !== "undefined") Toast.show(msg, "info", { duration: 1800 });
+});
 
 function renderWealth() {
   const w = wealthBreakdown();
