@@ -36,9 +36,12 @@
   /* Semantic */
   --pos: #00b574;
   --pos-bg: rgba(0, 181, 116, 0.1);
+  --pos-strong: #007a5e; /* AA-safe text color on bg / pos-bg */
   --neg: #e5364e;
   --neg-bg: rgba(229, 54, 78, 0.1);
   --warn: #ffb020;
+  /* Tinted accent that meets WCAG AA on light surfaces (>= 4.5:1) */
+  --accent-fg: #007a5e;
 
   /* Type */
   --font:
@@ -1152,7 +1155,7 @@ html[data-theme="dark"] .tab.active {
 }
 .trend-meta .delta.pos {
   background: var(--pos-bg);
-  color: var(--pos);
+  color: var(--pos-strong);
 }
 .trend-meta .delta.neg {
   background: var(--neg-bg);
@@ -1790,7 +1793,7 @@ html[data-theme="dark"] .price-card .pull-btn {
 .sheet-action {
   font-size: 16px;
   font-weight: 500;
-  color: var(--neon-1);
+  color: var(--accent-fg);
   padding: 6px 4px;
   letter-spacing: -0.01em;
 }
