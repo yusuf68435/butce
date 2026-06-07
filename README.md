@@ -8,17 +8,21 @@ Kişisel finans takibi yapan, **sunucusuz, çevrimdışı çalışan** PWA. Tüm
 ## Özellikler
 
 - **3 sekme**: Nakit (gelir/gider) · Bekleyen (tahsilat) · Gümüş (gram/ons/fon pozisyon)
-- iOS HIG uyumlu UI: gradient hero kart, donut grafik, sparkline, alış→şimdi→hedef numline
-- 3-wheel **Apple-tarzı tarih seçici**, drag-to-dismiss sheet'ler, FLIP animated reorder
-- Dark/Light/Auto tema, **TR/EN dil**, **bakiyeyi gizle** (privacy mode)
-- **Multi-currency**: TRY / USD / EUR — Frankfurter.app ile FX cache (offline-first, veri ₺ olarak saklanır)
+- iOS HIG uyumlu UI: gradient hero kart, donut grafik, sparkline, 3-wheel tarih seçici, drag-to-dismiss sheet'ler
+- **İçgörüler**: ay sonu bakiye tahmini, geçen aya kıyas, en çok kategori, anomali tespiti
+- **Etiketler** (işlem başına) + **etiket harcama raporu** + **hızlı giriş şablonları**
+- **Birikim hedefleri** (ilerleme çubuğu) + **borç takibi** (kim kime, net durum, vade hatırlatıcı)
+- **Kategori bütçe limitleri** — harcanan/limit çubukları + native `Notification API` uyarısı
 - **Aylık tekrarlayan işlemler** (otomatik kira/maaş/fatura)
-- **Kategori bütçe limitleri** + native `Notification API` uyarısı
-- **Fiş fotoğrafı**: IndexedDB blob storage, otomatik JPEG sıkıştırma, lazy thumbnail
-- **GitHub-tarzı yıllık ısı haritası** (gider yoğunluğu, quartile renk skalası)
-- **Cmd+K arama paleti** — kategori, açıklama, tutar; canlı debounce + highlight
-- **Pull-to-refresh** (Gümüş sekmesinde fiyat çekimi), **Haptic feedback** (Vibration API)
-- **CSV import** (`date,type,category,amount,description`), JSON yedekleme (içe/dışa)
+- **GitHub-tarzı yıllık ısı haritası** + **aylık takvim** (güne dokun → o tarihe kayıt) + **kategori trendi**
+- **Aylık yazdırılabilir / PDF rapor**
+- **Uygulama kilidi** — PBKDF2 ile hash'lenmiş PIN (açılışta keypad)
+- **Şifreli yedek** (AES-256-GCM + PBKDF2) · JSON + CSV içe/dışa aktarma
+- **Cmd+K arama paleti** — metin + tür/tarih aralığı filtresi; canlı debounce + highlight
+- **PWA kısayolları** (`?action=new-tx`) + **ilk açılış onboarding** (örnek veri)
+- **Fiş fotoğrafı** (IndexedDB, JPEG sıkıştırma, lazy thumbnail)
+- **Multi-currency** (TRY / USD / EUR — Frankfurter.app FX cache, offline-first, veri ₺ saklanır)
+- Dark/Light/Auto tema · **TR/EN dil** · **bakiyeyi gizle** · Pull-to-refresh · Haptic feedback
 - Çevrimdışı tam fonksiyonel (Service Worker), WCAG AA (Lighthouse 100), SEO 100
 
 ## Çalıştırma (yerel)
@@ -82,20 +86,20 @@ git push -u origin main
 
 ```
 .
-├── apple-tasarim.css   # Apple-tarzı tasarım dosyası — token sistem, ~2700 satır (kökte)
+├── apple-tasarim.css   # Apple-tarzı tasarım dosyası — token sistem, ~3500 satır (kökte)
 ├── uygulama/           # Çalışan uygulama (apple-tasarim.css'i ../ ile çeker)
-│   ├── index.html      # Tek sayfa, 3 sekme + 11 sheet (~1100 satır)
-│   ├── app.js          # Modüler vanilla JS IIFE, ~4500 satır
+│   ├── index.html      # Tek sayfa, 3 sekme + ~15 sheet (~1480 satır)
+│   ├── app.js          # Modüler vanilla JS IIFE, ~6400 satır
 │   │                   #   Store · FX · Photos (IDB) · Currency · Theme · Lang
 │   │                   #   Privacy · Sheets · Toast · Confirm · Prompt · DatePicker
 │   │                   #   TxSheet · PendingSheet · CollectSheet · SilverSheet
 │   │                   #   MonthPicker · Settings · Budgets · Recurring · SearchPalette
 │   ├── manifest.json   # PWA manifest (categories, shortcuts, maskable)
-│   └── service-worker.js   # Cache-first + update prompt (ggai-v35)
+│   └── service-worker.js   # Cache-first + update prompt (ggai-v38)
 └── tools/                  # build düz dist/ üretir (Vercel buradan deploy eder)
     ├── build.mjs       # terser + csso → dist/
-    ├── capture.mjs     # Playwright 20-screenshot pipeline
-    └── tests.mjs       # 19 unit tests, vm sandbox
+    ├── capture.mjs     # Playwright 25-screenshot pipeline
+    └── tests.mjs       # 40 unit tests, vm sandbox
 ```
 
 ## Geliştirme
@@ -104,7 +108,7 @@ git push -u origin main
 # Kurulum (sadece capture script için)
 npm install
 
-# 20 screenshot al
+# 25 screenshot al
 npm run capture
 ```
 

@@ -1,4 +1,4 @@
-// Otomatik 20 ekran görüntüsü — screenshots/ klasörüne PNG olarak yazar.
+// Otomatik 25 ekran görüntüsü — screenshots/ klasörüne PNG olarak yazar.
 // Çalıştırma: node tools/capture.mjs
 // Önkoşul: npm i playwright
 
@@ -27,10 +27,10 @@ const SEED = `(() => {
       { id:'t1', type:'income',  category:'Maaş/Proje',   description:'Nisan maaşı',           amount:85000, date:daysAgo(2) },
       { id:'t2', type:'income',  category:'Kira (gelen)', description:'Daire 3',               amount:12500, date:daysAgo(5) },
       { id:'t3', type:'expense', category:'Kira/Ev',      description:'Apartman dahil',        amount:22000, date:daysAgo(1) },
-      { id:'t4', type:'expense', category:'Market',       description:'Migros',                amount:4350,  date:daysAgo(3) },
+      { id:'t4', type:'expense', category:'Market',       description:'Migros',                amount:4350,  date:daysAgo(3), tags:['mutfak'] },
       { id:'t5', type:'expense', category:'Yakıt/Ulaşım', description:'Shell',                 amount:1800,  date:daysAgo(4) },
       { id:'t6', type:'expense', category:'Fatura',       description:'Elektrik + İnternet',   amount:2280,  date:daysAgo(6) },
-      { id:'t7', type:'expense', category:'Yemek',        description:'Akşam',                 amount:950,   date:daysAgo(2) },
+      { id:'t7', type:'expense', category:'Yemek',        description:'Akşam',                 amount:950,   date:daysAgo(2), tags:['dışarı'] },
       { id:'t8', type:'expense', category:'Sağlık',       description:'Eczane',                amount:460,   date:daysAgo(7) },
     ],
     pending: [
@@ -47,7 +47,20 @@ const SEED = `(() => {
       income:  ['Maaş/Proje','Kira (gelen)','Diğer gelir'],
       expense: ['Kira/Ev','Market','Yakıt/Ulaşım','Fatura','Yemek','Ofis/UYART','Sağlık','Diğer gider'],
     },
-    settings: { silverGramPrice: 52 },
+    budgets: { Market: 5000, Yemek: 1500 },
+    goals: [
+      { id:'g1', label:'Tatil fonu',  target:30000, saved:18500, createdAt:daysAgo(60) },
+      { id:'g2', label:'Acil durum',  target:50000, saved:50000, createdAt:daysAgo(90) },
+    ],
+    debts: [
+      { id:'d1', label:'Ali — yemek',  amount:300,  direction:'owedToMe', settled:false, createdAt:daysAgo(5) },
+      { id:'d2', label:'Kira avansı',  amount:1200, direction:'iOwe',     settled:false, createdAt:daysAgo(10) },
+    ],
+    templates: [
+      { id:'tp1', label:'Market', type:'expense', category:'Market' },
+      { id:'tp2', label:'Kahve',  type:'expense', category:'Yemek', amount:90 },
+    ],
+    settings: { silverGramPrice: 52, onboarded: true },
   };
   localStorage.setItem('ggai:state:v1', JSON.stringify(state));
 })()`;
@@ -59,9 +72,12 @@ const EMPTY_STATE = `(() => {
       income:  ['Maaş/Proje','Kira (gelen)','Diğer gelir'],
       expense: ['Kira/Ev','Market','Yakıt/Ulaşım','Fatura','Yemek','Ofis/UYART','Sağlık','Diğer gider'],
     },
-    settings: {}
+    settings: { onboarded: true }
   }));
 })()`;
+
+// First-run state (no onboarded flag) — used to capture the welcome sheet.
+const ONBOARD_STATE = `(() => { localStorage.removeItem('ggai:state:v1'); })()`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -254,6 +270,43 @@ async function run() {
       await shoot(page, "13-sheet-settings.png");
       await closeSheet(page, "sheet-settings");
 
+      // 21 Goals sheet
+      await page.click("#open-settings");
+      await sleep(500);
+      await page.click("#open-goals");
+      await sleep(600);
+      await shoot(page, "21-sheet-goals.png");
+      await closeSheet(page, "sheet-goals");
+      await closeSheet(page, "sheet-settings");
+
+      // 22 Debts sheet
+      await page.click("#open-settings");
+      await sleep(500);
+      await page.click("#open-debts");
+      await sleep(600);
+      await shoot(page, "22-sheet-debts.png");
+      await closeSheet(page, "sheet-debts");
+      await closeSheet(page, "sheet-settings");
+
+      // 23 Budgets with progress bars
+      await page.click("#open-settings");
+      await sleep(500);
+      await page.click("#open-budgets");
+      await sleep(600);
+      await shoot(page, "23-sheet-budgets.png");
+      await closeSheet(page, "sheet-budgets");
+      await closeSheet(page, "sheet-settings");
+
+      // 24 Search with filters
+      await page.click("#open-search");
+      await sleep(600);
+      await page.click('[data-search-type="expense"]');
+      await sleep(200);
+      await page.click('[data-search-range="month"]');
+      await sleep(400);
+      await shoot(page, "24-sheet-search.png");
+      await closeSheet(page, "sheet-search");
+
       // ── Empty states ──
       await page.evaluate(EMPTY_STATE);
       await page.goto(BASE + "/?empty=" + Date.now(), {
@@ -272,6 +325,15 @@ async function run() {
       // 16 Empty silver
       await clickTab(page, "silver");
       await shoot(page, "16-light-empty-silver.png");
+
+      // 25 Onboarding (first-run welcome)
+      await page.evaluate(ONBOARD_STATE);
+      await page.goto(BASE + "/?ob=" + Date.now(), { waitUntil: "load" });
+      await page
+        .waitForSelector("#sheet-onboarding.open", { timeout: 3000 })
+        .catch(() => {});
+      await sleep(700);
+      await shoot(page, "25-onboarding.png");
 
       await ctx.close();
     }
@@ -306,7 +368,7 @@ async function run() {
       await ctx.close();
     }
 
-    console.log("\n→ 20 ekran görüntüsü", OUT, "klasörüne yazıldı.");
+    console.log("\n→ 25 ekran görüntüsü", OUT, "klasörüne yazıldı.");
   } finally {
     await browser.close();
     server.kill();
