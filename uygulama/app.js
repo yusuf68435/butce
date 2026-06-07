@@ -4669,6 +4669,7 @@ function renderTemplates() {
     const chip = el("button", {
       type: "button",
       class: "tpl-chip",
+      "aria-label": `${tpl.label}${tpl.amount ? " " + fmt.try(tpl.amount) : ""} — hızlı ekle`,
       onclick: () => {
         if (chip._lpFired) {
           chip._lpFired = false;
@@ -5434,7 +5435,12 @@ const AppLock = (() => {
       pad.appendChild(
         el(
           "button",
-          { type: "button", class: "lock-key", onclick: () => press(k) },
+          {
+            type: "button",
+            class: "lock-key",
+            "aria-label": k === "⌫" ? "Sil" : k,
+            onclick: () => press(k),
+          },
           k,
         ),
       );
@@ -5501,6 +5507,7 @@ const AppLock = (() => {
     screen.hidden = false;
     document.body.classList.add("locked");
     hydrateIcons(screen);
+    setTimeout(() => $("#lock-pad .lock-key")?.focus(), 60);
     // Offer biometric immediately if registered
     if (Store.state.settings.lock?.bioId) unlockBiometric();
   }
@@ -6594,6 +6601,7 @@ function bindAccent() {
         class: `accent-swatch${c === cur ? " active" : ""}`,
         style: `background:${c}`,
         "aria-label": `Aksan rengi ${c}`,
+        "aria-pressed": String(c === cur),
         onclick: () => {
           Store.update((s) => {
             s.settings.accent = c;

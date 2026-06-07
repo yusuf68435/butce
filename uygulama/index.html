@@ -59,8 +59,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
-    <link rel="stylesheet" href="../apple-tasarim.css?v=38" />
-    <link rel="preload" as="script" href="app.js?v=38" />
+    <link rel="stylesheet" href="../apple-tasarim.css?v=39" />
+    <link rel="preload" as="script" href="app.js?v=39" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -179,7 +179,11 @@
               <div class="section-title">Birikim Eğrisi</div>
               <div class="trend-card">
                 <div class="trend-meta" id="networth-meta"></div>
-                <div class="networth-spark" id="networth-spark"></div>
+                <div
+                  class="networth-spark"
+                  id="networth-spark"
+                  aria-hidden="true"
+                ></div>
               </div>
             </section>
 
@@ -383,7 +387,14 @@
          SHEETS (scrim + sheet pattern)
          ============================================================ -->
     <!-- App lock screen -->
-    <div class="lock-screen" id="lock-screen" hidden>
+    <div
+      class="lock-screen"
+      id="lock-screen"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Uygulama kilidi"
+      hidden
+    >
       <div class="lock-box" id="lock-box">
         <span class="lock-icon" data-icon="key" aria-hidden="true"></span>
         <div class="lock-title">Bütçe Kilitli</div>
@@ -1515,6 +1526,6 @@
     <!-- Printable monthly report (shown only when printing) -->
     <div id="print-report" aria-hidden="true"></div>
 
-    <script src="app.js?v=38" defer></script>
+    <script src="app.js?v=39" defer></script>
   </body>
 </html>
