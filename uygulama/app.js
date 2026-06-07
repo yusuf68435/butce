@@ -806,6 +806,37 @@ function goalProgress(saved, target) {
   if (!target || target <= 0) return 0;
   return Math.max(0, Math.min(100, ((Number(saved) || 0) / target) * 100));
 }
+/** Collect debts/pending that are due on or before `todayIso` (for reminders). */
+function collectDueReminders(debts, pending, todayIso) {
+  const out = [];
+  for (const d of debts || []) {
+    if (d.settled || !d.dueDate) continue;
+    if (d.dueDate <= todayIso) {
+      out.push({
+        kind: "debt",
+        id: d.id,
+        label: d.label,
+        amount: Number(d.amount) || 0,
+        direction: d.direction,
+        dueDate: d.dueDate,
+      });
+    }
+  }
+  for (const p of pending || []) {
+    if (!p.exactDate) continue;
+    if (p.exactDate <= todayIso) {
+      out.push({
+        kind: "pending",
+        id: p.id,
+        label: p.source || "Bekleyen tahsilat",
+        amount: Number(p.amount) || 0,
+        dueDate: p.exactDate,
+      });
+    }
+  }
+  return out;
+}
+
 /** Net debt position from a debts list (ignores settled rows). */
 function debtsNet(debts) {
   let owedToMe = 0;
@@ -1306,6 +1337,11 @@ const Debts = (() => {
     }
     for (const d of debts) {
       const dirLabel = d.direction === "owedToMe" ? "Bana borçlu" : "Borçluyum";
+      const overdue = d.dueDate && !d.settled && d.dueDate <= todayISO();
+      let sub = dirLabel;
+      if (d.dueDate) sub += ` · vade ${fmt.date(d.dueDate)}`;
+      if (d.settled) sub += " · kapandı";
+      else if (overdue) sub += " · vadesi geçti";
       const row = el("div", { class: "row" });
       row.appendChild(
         el("span", {
@@ -1316,11 +1352,7 @@ const Debts = (() => {
       const text = el("div", { class: "row-text" });
       text.appendChild(el("div", { class: "row-title" }, d.label));
       text.appendChild(
-        el(
-          "div",
-          { class: "row-sub" },
-          dirLabel + (d.settled ? " · kapandı" : ""),
-        ),
+        el("div", { class: `row-sub${overdue ? " overdue" : ""}` }, sub),
       );
       row.appendChild(text);
       row.appendChild(
@@ -1377,6 +1409,7 @@ const Debts = (() => {
       Toast.show("Geçerli bir tutar gir", "error");
       return;
     }
+    const dueDate = $("#debt-due").value || undefined;
     Store.update((s) => {
       s.debts = s.debts || [];
       s.debts.push({
@@ -1385,11 +1418,13 @@ const Debts = (() => {
         amount,
         direction: addDir,
         settled: false,
+        dueDate,
         createdAt: todayISO(),
       });
     });
     $("#debt-label").value = "";
     $("#debt-amount").value = "";
+    $("#debt-due").value = "";
     Haptics.light();
     renderList();
   }
@@ -5633,6 +5668,34 @@ function autoLabelInputs() {
   });
 }
 
+/** Open the right sheet when launched via a PWA shortcut (?action=...). */
+function handleLaunchAction() {
+  try {
+    const action = new URLSearchParams(location.search).get("action");
+    if (!action) return;
+    // Clean the URL so a reload/return doesn't re-trigger the sheet.
+    history.replaceState({}, "", location.pathname);
+    if (action === "new-tx") TxSheet.open();
+    else if (action === "new-pending") PendingSheet.open();
+  } catch {}
+}
+
+/** Notify about debts/pending whose due date has arrived. */
+function remindDue() {
+  const items = collectDueReminders(
+    Store.state.debts,
+    Store.state.pending,
+    todayISO(),
+  );
+  if (!items.length) return;
+  const msg =
+    items.length === 1
+      ? `Vadesi geldi: ${items[0].label} (${fmt.try(items[0].amount)})`
+      : `${items.length} kayıt vadesinde — borç/bekleyen kontrol et`;
+  Toast.show(msg, "info", { duration: 5000 });
+  Notifier.send("Vade Hatırlatıcı", msg, { tag: "due-reminder" });
+}
+
 function init() {
   Theme.init();
   Lang.init();
@@ -5686,15 +5749,22 @@ function init() {
     }
     // Backup reminder — delayed so it doesn't collide with the recurring toast
     setTimeout(() => Settings.maybeRemindBackup(), applied > 0 ? 3500 : 1200);
+    // Due reminders (debts / pending) — staggered after the backup nudge
+    setTimeout(remindDue, applied > 0 ? 5500 : 3000);
   });
 
   // Wrap native date inputs with custom pill
-  ["#tx-date", "#pending-date", "#collect-date", "#silver-buy-date"].forEach(
-    (sel) => attachDatePill($(sel)),
-  );
+  [
+    "#tx-date",
+    "#pending-date",
+    "#collect-date",
+    "#silver-buy-date",
+    "#debt-due",
+  ].forEach((sel) => attachDatePill($(sel)));
 
   Store.subscribe(renderAll);
   switchTab("cash");
+  handleLaunchAction();
   bindOnlineStatus();
   registerSW();
 }

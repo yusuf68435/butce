@@ -154,7 +154,7 @@ const APP_PLUS_EXPORTS =
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
-  normalizeTags, goalProgress, debtsNet,
+  normalizeTags, goalProgress, debtsNet, collectDueReminders,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -507,6 +507,23 @@ test("debtsNet sums by direction and ignores settled", () => {
     iOwe: 0,
     net: 0,
   });
+});
+
+test("collectDueReminders: due/overdue debts + pending, ignores settled/future", () => {
+  const debts = [
+    { id: "d1", label: "Ali", amount: 300, direction: "owedToMe", dueDate: "2026-06-01" }, // overdue
+    { id: "d2", label: "Veli", amount: 100, direction: "iOwe", dueDate: "2099-01-01" }, // future
+    { id: "d3", label: "X", amount: 50, direction: "iOwe", dueDate: "2026-06-01", settled: true }, // settled
+    { id: "d4", label: "NoDate", amount: 10, direction: "iOwe" }, // no due date
+  ];
+  const pending = [
+    { id: "p1", source: "Fatura iadesi", amount: 200, exactDate: "2026-06-07" }, // due today
+    { id: "p2", source: "Gelecek", amount: 999, exactDate: "2099-01-01" }, // future
+    { id: "p3", source: "Belirsiz", amount: 5 }, // no exactDate
+  ];
+  const due = sandbox.collectDueReminders(debts, pending, "2026-06-07");
+  const ids = due.map((x) => x.id).sort();
+  assert.deepEqual(plain(ids), ["d1", "p1"]);
 });
 
 // Run

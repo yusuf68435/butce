@@ -1397,6 +1397,10 @@ html[data-theme="dark"] .tab.active {
   padding-right: 0;
   background: transparent;
 }
+.row-sub.overdue {
+  color: var(--neg);
+  font-weight: 600;
+}
 .trend-chart {
   position: relative;
   height: 100px;
