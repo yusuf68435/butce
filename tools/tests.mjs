@@ -154,6 +154,7 @@ const APP_PLUS_EXPORTS =
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
+  normalizeTags,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -459,6 +460,29 @@ test("detectAnomaly flags a category that spiked vs recent average", () => {
   assert.equal(anomaly.category, "Fatura");
   assert.equal(anomaly.amount, 1500);
   assert.equal(anomaly.avg, 300);
+});
+
+// Arrays returned from the vm sandbox have a different Array prototype than the
+// test realm, so deepEqual sees them as "not reference-equal". JSON round-trip
+// re-creates them with the test realm's Array.
+const plain = (v) => JSON.parse(JSON.stringify(v));
+
+test("normalizeTags: trims, lowercases, dedupes, drops empties", () => {
+  assert.deepEqual(plain(sandbox.normalizeTags("Tatil, Work ,tatil, ")), [
+    "tatil",
+    "work",
+  ]);
+  assert.deepEqual(plain(sandbox.normalizeTags("")), []);
+  assert.deepEqual(plain(sandbox.normalizeTags("a\nb,c")), ["a", "b", "c"]);
+  assert.deepEqual(plain(sandbox.normalizeTags(["X", "x", "Y"])), ["x", "y"]);
+  // multi-word tag keeps its single inner space
+  assert.deepEqual(plain(sandbox.normalizeTags("is  yemegi")), ["is yemegi"]);
+});
+
+test("normalizeTags: caps count at 8 and drops over-long tags", () => {
+  const many = Array.from({ length: 12 }, (_, i) => "t" + i).join(",");
+  assert.equal(sandbox.normalizeTags(many).length, 8);
+  assert.deepEqual(plain(sandbox.normalizeTags("a".repeat(40))), []);
 });
 
 // Run

@@ -785,6 +785,22 @@ function daysSince(iso) {
   if (!iso) return 0;
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
+const MAX_TAG_LEN = 24;
+const MAX_TAGS = 8;
+/** Parse a comma/newline separated tag string (or array) into a clean tag list. */
+function normalizeTags(input) {
+  const raw = Array.isArray(input) ? input : String(input || "").split(/[,\n]/);
+  const out = [];
+  const seen = new Set();
+  for (let tag of raw) {
+    tag = String(tag).trim().toLowerCase().replace(/\s+/g, " ");
+    if (!tag || tag.length > MAX_TAG_LEN || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+    if (out.length >= MAX_TAGS) break;
+  }
+  return out;
+}
 function parseAmount(input) {
   if (typeof input !== "string") input = String(input ?? "");
   const cleaned = input
@@ -2305,6 +2321,7 @@ function renderCash() {
   // sparkline = last 6 months balance
   drawSparkline($("#cash-spark"), monthlyTrend(6, "balance"));
 
+  renderTemplates();
   renderWealth();
   renderInsights();
   renderTrend();
@@ -2879,6 +2896,13 @@ function renderTxList(list) {
     }
     text.appendChild(title);
     text.appendChild(el("div", { class: "row-sub" }, sub));
+    if (Array.isArray(t.tags) && t.tags.length) {
+      const tagWrap = el("div", { class: "row-tags" });
+      for (const tg of t.tags) {
+        tagWrap.appendChild(el("span", { class: "row-tag" }, tg));
+      }
+      text.appendChild(tagWrap);
+    }
     row.appendChild(text);
     row.appendChild(
       el(
@@ -3334,7 +3358,8 @@ const SearchPalette = (() => {
       const cat = (tx.category || "").toLowerCase();
       const desc = (tx.description || "").toLowerCase();
       const amt = String(Math.round(Number(tx.amount) || 0));
-      if (cat.includes(q) || desc.includes(q) || amt.includes(q)) {
+      const tagHit = (tx.tags || []).some((tg) => tg.includes(q));
+      if (cat.includes(q) || desc.includes(q) || amt.includes(q) || tagHit) {
         out.push(tx);
       }
     }
@@ -3483,7 +3508,7 @@ const TxSheet = (() => {
   let pendingRemove = false; // user removed an existing photo
   let _previewUrl = null;
 
-  function open(id = null) {
+  function open(id = null, prefill = null) {
     editingId = id;
     pendingBlob = null;
     pendingRemove = false;
@@ -3497,14 +3522,23 @@ const TxSheet = (() => {
       $("#tx-title").textContent = "Hareket";
       $("#tx-amount").value = inputAmount(t.amount);
       $("#tx-desc").value = t.description || "";
+      $("#tx-tags").value = (t.tags || []).join(", ");
       $("#tx-date").value = t.date;
       $("#tx-delete").hidden = false;
     } else {
-      type = "expense";
-      category = Store.state.settings.lastUsedCategory?.[type] || null;
-      $("#tx-title").textContent = "Yeni Hareket";
-      $("#tx-amount").value = "";
-      $("#tx-desc").value = "";
+      type = prefill?.type || "expense";
+      category =
+        prefill?.category ||
+        Store.state.settings.lastUsedCategory?.[type] ||
+        null;
+      $("#tx-title").textContent = prefill
+        ? prefill.label || "Yeni Hareket"
+        : "Yeni Hareket";
+      $("#tx-amount").value = prefill?.amount
+        ? inputAmount(prefill.amount)
+        : "";
+      $("#tx-desc").value = prefill?.description || "";
+      $("#tx-tags").value = (prefill?.tags || []).join(", ");
       $("#tx-date").value = todayISO();
       $("#tx-delete").hidden = true;
     }
@@ -3683,6 +3717,7 @@ const TxSheet = (() => {
       }
       const date = $("#tx-date").value || todayISO();
       const description = $("#tx-desc").value.trim();
+      const tags = normalizeTags($("#tx-tags").value);
 
       // Resolve the new photoId BEFORE writing the store. If the write fails
       // halfway through, it's safer to orphan a blob (cleanable later) than
@@ -3717,6 +3752,8 @@ const TxSheet = (() => {
               photoId: nextPhotoId || undefined,
             });
             if (!nextPhotoId) delete tr.photoId;
+            if (tags.length) tr.tags = tags;
+            else delete tr.tags;
           }
         } else {
           const tx = {
@@ -3728,6 +3765,7 @@ const TxSheet = (() => {
             date,
           };
           if (nextPhotoId) tx.photoId = nextPhotoId;
+          if (tags.length) tx.tags = tags;
           s.transactions.push(tx);
         }
         s.settings.lastUsedCategory = s.settings.lastUsedCategory || {};
@@ -3790,9 +3828,41 @@ const TxSheet = (() => {
     Toast.show("Hareket silindi", "success");
   }
 
+  /** Persist the current form as a reusable quick-add template. */
+  async function saveAsTemplate() {
+    if (!category) {
+      Toast.show("Önce bir kategori seç", "error");
+      return;
+    }
+    const amount = parseAmount($("#tx-amount").value) || 0;
+    const description = $("#tx-desc").value.trim();
+    const tags = normalizeTags($("#tx-tags").value);
+    const label = await Prompt.show({
+      title: "Şablon Adı",
+      label: "Bu hızlı girişe ad ver",
+      placeholder: category,
+    });
+    if (label === null) return; // cancelled
+    Store.update((s) => {
+      s.templates = s.templates || [];
+      s.templates.push({
+        id: uid(),
+        label: label || category,
+        type,
+        category,
+        amount: amount || undefined,
+        description: description || undefined,
+        tags: tags.length ? tags : undefined,
+      });
+    });
+    Toast.show("Şablon kaydedildi", "success");
+  }
+
   function bind() {
     $("#tx-save").addEventListener("click", save);
     $("#tx-delete").addEventListener("click", remove);
+    const tplBtn = $("#tx-save-template");
+    if (tplBtn) tplBtn.addEventListener("click", saveAsTemplate);
     const attach = $("#receipt-attach");
     if (attach) attach.addEventListener("click", pickPhoto);
     const file = $("#receipt-file");
@@ -3824,6 +3894,79 @@ const TxSheet = (() => {
   }
   return { open, bind };
 })();
+
+/* ==========================================================================
+   TEMPLATES — quick-add chip strip on the cash page
+   ========================================================================== */
+
+function bindTemplateLongPress(chip, tpl) {
+  let timer = 0;
+  const start = () => {
+    timer = setTimeout(async () => {
+      timer = 0;
+      chip._lpFired = true; // suppress the click that follows pointerup
+      Haptics.medium();
+      const ok = await Confirm.show({
+        title: "Şablon silinsin mi?",
+        message: tpl.label,
+        confirmLabel: "Sil",
+        danger: true,
+      });
+      if (ok) {
+        Store.update((s) => {
+          s.templates = (s.templates || []).filter((x) => x.id !== tpl.id);
+        });
+      }
+    }, 600);
+  };
+  const cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+    }
+  };
+  chip.addEventListener("pointerdown", start);
+  chip.addEventListener("pointerup", cancel);
+  chip.addEventListener("pointerleave", cancel);
+  chip.addEventListener("pointercancel", cancel);
+}
+
+function renderTemplates() {
+  const section = $("#templates-section");
+  const strip = $("#template-strip");
+  if (!section || !strip) return;
+  const templates = Store.state.templates || [];
+  if (!templates.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  clear(strip);
+  for (const tpl of templates) {
+    const chip = el("button", {
+      type: "button",
+      class: "tpl-chip",
+      onclick: () => {
+        if (chip._lpFired) {
+          chip._lpFired = false;
+          return; // long-press handled deletion; ignore the click
+        }
+        TxSheet.open(null, tpl);
+      },
+    });
+    chip.appendChild(
+      el("span", {
+        class: `tpl-dot ${tpl.type === "income" ? "pos" : "neg"}`,
+      }),
+    );
+    chip.appendChild(el("span", { class: "tpl-label" }, tpl.label));
+    if (tpl.amount) {
+      chip.appendChild(el("span", { class: "tpl-amt" }, fmt.try(tpl.amount)));
+    }
+    bindTemplateLongPress(chip, tpl);
+    strip.appendChild(chip);
+  }
+}
 
 /* ==========================================================================
    PENDING SHEET

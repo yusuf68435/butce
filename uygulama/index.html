@@ -130,6 +130,11 @@
               </button>
             </div>
 
+            <section class="section" id="templates-section" hidden>
+              <div class="section-title">Hızlı Giriş</div>
+              <div class="template-strip" id="template-strip"></div>
+            </section>
+
             <section class="section">
               <div class="section-title" data-i18n="section.wealth">
                 Toplam Servet
@@ -402,6 +407,16 @@
         </div>
 
         <div class="field">
+          <div class="field-label">Etiketler</div>
+          <input
+            type="text"
+            id="tx-tags"
+            class="input"
+            placeholder="virgülle ayır: tatil, iş"
+          />
+        </div>
+
+        <div class="field">
           <div class="field-label">Tarih</div>
           <input type="date" id="tx-date" class="input" />
         </div>
@@ -447,6 +462,10 @@
           capture="environment"
           hidden
         />
+
+        <button type="button" class="tx-secondary-btn" id="tx-save-template">
+          + Şablon olarak kaydet
+        </button>
 
         <button
           type="button"
