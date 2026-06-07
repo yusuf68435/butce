@@ -59,8 +59,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
-    <link rel="stylesheet" href="../apple-tasarim.css?v=36" />
-    <link rel="preload" as="script" href="app.js?v=36" />
+    <link rel="stylesheet" href="../apple-tasarim.css?v=37" />
+    <link rel="preload" as="script" href="app.js?v=37" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -1026,6 +1026,36 @@
     />
     <input type="file" id="import-csv-file" accept="text/csv,.csv" hidden />
 
+    <!-- Onboarding sheet -->
+    <div
+      class="sheet"
+      id="sheet-onboarding"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="onboard-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <div class="sheet-body onboard-body">
+        <span
+          class="onboard-glyph"
+          data-icon="wallet"
+          aria-hidden="true"
+        ></span>
+        <h2 class="onboard-title" id="onboard-title">Bütçe'ye Hoş Geldin</h2>
+        <p class="onboard-text">
+          Gelir-gider, bekleyen tahsilat, gümüş, hedefler ve daha fazlası —
+          hepsi cihazında, sunucusuz. Denemek için örnek veriyle
+          başlayabilirsin.
+        </p>
+        <button type="button" class="onboard-btn primary" id="onboard-sample">
+          Örnek veriyle başla
+        </button>
+        <button type="button" class="onboard-btn" id="onboard-empty">
+          Boş başla
+        </button>
+      </div>
+    </div>
+
     <!-- Goals sheet -->
     <div
       class="sheet"
@@ -1382,6 +1412,34 @@
             aria-label="Hareket arama"
           />
         </div>
+        <div class="search-filters" id="search-filters">
+          <div class="seg" style="--n: 3">
+            <span class="seg-thumb" id="search-type-thumb"></span>
+            <button type="button" class="seg-opt active" data-search-type="all">
+              Tümü
+            </button>
+            <button type="button" class="seg-opt" data-search-type="income">
+              Gelir
+            </button>
+            <button type="button" class="seg-opt" data-search-type="expense">
+              Gider
+            </button>
+          </div>
+          <div class="chips search-range">
+            <button type="button" class="chip active" data-search-range="all">
+              Tüm zamanlar
+            </button>
+            <button type="button" class="chip" data-search-range="month">
+              Bu ay
+            </button>
+            <button type="button" class="chip" data-search-range="3m">
+              Son 3 ay
+            </button>
+            <button type="button" class="chip" data-search-range="year">
+              Bu yıl
+            </button>
+          </div>
+        </div>
         <div class="search-meta" id="search-meta" data-i18n="search.hint">
           Açıklama, kategori veya tutara göre ara
         </div>
@@ -1417,6 +1475,6 @@
     <!-- Printable monthly report (shown only when printing) -->
     <div id="print-report" aria-hidden="true"></div>
 
-    <script src="app.js?v=36" defer></script>
+    <script src="app.js?v=37" defer></script>
   </body>
 </html>

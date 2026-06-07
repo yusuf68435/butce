@@ -3923,16 +3923,47 @@ function setSegThumb(rootSelector, activeIndex) {
    SEARCH PALETTE — instant transaction search (Cmd+K / topbar button)
    ========================================================================== */
 
+/** Filter transactions by type ("all"|"income"|"expense") and date range
+    ("all"|"month"|"3m"|"year"). Pure — todayIso injectable for tests. */
+function applyTxFilters(list, type, range, todayIso) {
+  const today = todayIso || todayISO();
+  let from = null;
+  if (range === "month") from = today.slice(0, 7) + "-01";
+  else if (range === "3m") from = shiftMonthKey(today.slice(0, 7), 2) + "-01";
+  else if (range === "year") from = today.slice(0, 4) + "-01-01";
+  return (list || []).filter((tx) => {
+    if (type && type !== "all" && tx.type !== type) return false;
+    if (from && (tx.date || "") < from) return false;
+    return true;
+  });
+}
+
 const SearchPalette = (() => {
   const MAX_RESULTS = 50;
+  let fType = "all";
+  let fRange = "all";
 
   function open() {
     const input = $("#search-input");
     if (input) input.value = "";
+    fType = "all";
+    fRange = "all";
+    syncFilterUI();
     render("");
     Sheets.open("sheet-search", () => {
       setTimeout(() => input?.focus(), 250);
     });
+  }
+
+  function syncFilterUI() {
+    $$("[data-search-type]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.searchType === fType),
+    );
+    const idx = ["all", "income", "expense"].indexOf(fType);
+    setSegThumb("#sheet-search .seg", idx < 0 ? 0 : idx);
+    $$("[data-search-range]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.searchRange === fRange),
+    );
   }
 
   function searchTransactions(query) {
@@ -3977,13 +4008,21 @@ const SearchPalette = (() => {
     if (!root) return;
     clear(root);
     const q = (query || "").toLowerCase().trim();
+    const hasFilter = fType !== "all" || fRange !== "all";
 
-    if (!q) {
+    if (!q && !hasFilter) {
       if (meta) meta.textContent = t("search.hint");
       return;
     }
 
-    const matches = searchTransactions(q);
+    let matches = q
+      ? searchTransactions(q)
+      : [...Store.state.transactions].sort(
+          (a, b) =>
+            (b.date || "").localeCompare(a.date || "") ||
+            (b.id || "").localeCompare(a.id || ""),
+        );
+    matches = applyTxFilters(matches, fType, fRange);
 
     if (!matches.length) {
       if (meta) meta.textContent = t("search.empty");
@@ -4070,6 +4109,20 @@ const SearchPalette = (() => {
         }
       });
     }
+    $$("[data-search-type]").forEach((b) =>
+      b.addEventListener("click", () => {
+        fType = b.dataset.searchType;
+        syncFilterUI();
+        render($("#search-input")?.value || "");
+      }),
+    );
+    $$("[data-search-range]").forEach((b) =>
+      b.addEventListener("click", () => {
+        fRange = b.dataset.searchRange;
+        syncFilterUI();
+        render($("#search-input")?.value || "");
+      }),
+    );
     // Cmd+K / Ctrl+K shortcut (skip if typing in another input)
     document.addEventListener("keydown", (e) => {
       const key = e.key?.toLowerCase();
@@ -6153,6 +6206,139 @@ function autoLabelInputs() {
   });
 }
 
+/** Build a realistic sample AppState for first-run onboarding. */
+function buildSampleData() {
+  const mk = (back, day) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - back);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  };
+  const tx = (type, category, amount, back, day, tags) => ({
+    id: uid(),
+    type,
+    category,
+    amount,
+    date: mk(back, day),
+    ...(tags ? { tags } : {}),
+  });
+  return {
+    transactions: [
+      tx("income", "Maaş/Proje", 45000, 0, 1),
+      tx("expense", "Kira/Ev", 15000, 0, 3),
+      tx("expense", "Market", 2400, 0, 5, ["mutfak"]),
+      tx("expense", "Yemek", 680, 0, 8, ["dışarı"]),
+      tx("expense", "Fatura", 1300, 0, 10),
+      tx("expense", "Yakıt/Ulaşım", 1100, 0, 12),
+      tx("income", "Maaş/Proje", 45000, 1, 1),
+      tx("expense", "Kira/Ev", 15000, 1, 3),
+      tx("expense", "Market", 2100, 1, 6, ["mutfak"]),
+      tx("expense", "Sağlık", 900, 1, 15),
+      tx("income", "Maaş/Proje", 45000, 2, 1),
+      tx("expense", "Kira/Ev", 15000, 2, 3),
+      tx("expense", "Market", 1950, 2, 7, ["mutfak"]),
+    ],
+    pending: [
+      {
+        id: uid(),
+        source: "Proje ödemesi",
+        amount: 12000,
+        eta: "thisMonth",
+        createdAt: todayISO(),
+      },
+    ],
+    silver: [
+      {
+        id: uid(),
+        kind: "gram",
+        amount: 50,
+        buyPrice: 35,
+        buyDate: mk(2, 10),
+        targetPrice: 60,
+      },
+    ],
+    categories: {
+      income: [...DEFAULT_CATEGORIES.income],
+      expense: [...DEFAULT_CATEGORIES.expense],
+    },
+    recurring: [
+      {
+        id: uid(),
+        type: "expense",
+        category: "Kira/Ev",
+        amount: 15000,
+        description: "Aylık kira",
+        dayOfMonth: 3,
+        lastApplied: null,
+      },
+    ],
+    budgets: { Market: 2500, Yemek: 1000 },
+    goals: [
+      {
+        id: uid(),
+        label: "Tatil fonu",
+        target: 30000,
+        saved: 12000,
+        createdAt: todayISO(),
+      },
+    ],
+    debts: [
+      {
+        id: uid(),
+        label: "Ali — yemek",
+        amount: 300,
+        direction: "owedToMe",
+        settled: false,
+        createdAt: todayISO(),
+      },
+    ],
+    templates: [
+      { id: uid(), label: "Market", type: "expense", category: "Market" },
+      {
+        id: uid(),
+        label: "Kahve",
+        type: "expense",
+        category: "Yemek",
+        amount: 90,
+      },
+    ],
+    settings: { onboarded: true },
+  };
+}
+
+/** Show the welcome sheet on first launch (no data yet). */
+function maybeOnboard() {
+  const s = Store.state;
+  if (s.settings.onboarded) return;
+  if (s.transactions.length || s.pending.length || s.silver.length) {
+    Store.update((st) => {
+      st.settings.onboarded = true;
+    });
+    return;
+  }
+  Sheets.open("sheet-onboarding");
+}
+
+function bindOnboarding() {
+  const sample = $("#onboard-sample");
+  if (sample) {
+    sample.addEventListener("click", () => {
+      Store.replace(buildSampleData());
+      Sheets.close("sheet-onboarding");
+      Toast.show("Örnek veri yüklendi — keşfet!", "success");
+    });
+  }
+  const empty = $("#onboard-empty");
+  if (empty) {
+    empty.addEventListener("click", () => {
+      Store.update((s) => {
+        s.settings.onboarded = true;
+      });
+      Sheets.close("sheet-onboarding");
+    });
+  }
+}
+
 /** Open the right sheet when launched via a PWA shortcut (?action=...). */
 function handleLaunchAction() {
   try {
@@ -6225,6 +6411,7 @@ function init() {
   Goals.bind();
   Debts.bind();
   AppLock.bind();
+  bindOnboarding();
   SearchPalette.bind();
 
   // Apply any due recurring rules — defer to idle so it doesn't block first paint
@@ -6252,6 +6439,7 @@ function init() {
   Store.subscribe(renderAll);
   switchTab("cash");
   handleLaunchAction();
+  maybeOnboard();
   bindOnlineStatus();
   registerSW();
 }

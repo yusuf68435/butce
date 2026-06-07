@@ -156,6 +156,7 @@ const APP_PLUS_EXPORTS =
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
   normalizeTags, goalProgress, debtsNet, collectDueReminders, tagSpending,
   AppLock, monthDailyExpense, categoryMonthlyTrend,
+  applyTxFilters, buildSampleData,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -584,6 +585,46 @@ test("categoryMonthlyTrend: per-category monthly series of correct length", () =
   assert.equal(series[0].v, 200);
   assert.equal(series[1].v, 0); // May: nothing
   assert.equal(series[2].v, 300); // June: only the expense
+});
+
+test("applyTxFilters: type + date range filtering", () => {
+  const list = [
+    { type: "income", amount: 5000, date: "2026-06-01" },
+    { type: "expense", amount: 100, date: "2026-06-10" },
+    { type: "expense", amount: 200, date: "2026-04-10" },
+    { type: "expense", amount: 300, date: "2025-12-10" },
+  ];
+  const today = "2026-06-15";
+  // type filter
+  assert.equal(
+    sandbox.applyTxFilters(list, "expense", "all", today).length,
+    3,
+  );
+  assert.equal(sandbox.applyTxFilters(list, "income", "all", today).length, 1);
+  // this month
+  assert.equal(sandbox.applyTxFilters(list, "all", "month", today).length, 2);
+  // last 3 months (Apr, May, Jun) → excludes Dec 2025
+  assert.equal(sandbox.applyTxFilters(list, "all", "3m", today).length, 3);
+  // this year → excludes Dec 2025
+  assert.equal(sandbox.applyTxFilters(list, "all", "year", today).length, 3);
+  // combined: expense this month
+  assert.equal(
+    sandbox.applyTxFilters(list, "expense", "month", today).length,
+    1,
+  );
+});
+
+test("buildSampleData: valid populated state with onboarded flag", () => {
+  const s = sandbox.buildSampleData();
+  assert.ok(s.transactions.length >= 10);
+  assert.ok(Array.isArray(s.goals) && s.goals.length >= 1);
+  assert.ok(Array.isArray(s.debts) && s.debts.length >= 1);
+  assert.ok(Array.isArray(s.templates) && s.templates.length >= 1);
+  assert.equal(s.settings.onboarded, true);
+  // every transaction has the required shape
+  for (const tx of s.transactions) {
+    assert.ok(tx.id && tx.type && tx.category && tx.amount > 0 && tx.date);
+  }
 });
 
 // Run

@@ -1580,6 +1580,77 @@ body.locked {
   animation: lockShake 0.4s;
 }
 
+/* ============ ONBOARDING ============ */
+.onboard-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 12px 22px 28px;
+}
+.onboard-glyph {
+  width: 56px;
+  height: 56px;
+  color: var(--accent, var(--fg-1));
+  display: grid;
+  place-items: center;
+}
+.onboard-glyph svg {
+  width: 48px;
+  height: 48px;
+}
+.onboard-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg-1);
+}
+.onboard-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fg-2);
+  max-width: 320px;
+}
+.onboard-btn {
+  width: 100%;
+  max-width: 320px;
+  padding: 15px;
+  border-radius: var(--r-input);
+  font-size: 16px;
+  font-weight: 600;
+  border: 1px solid var(--hairline);
+  background: var(--bg-2);
+  color: var(--fg-1);
+}
+.onboard-btn.primary {
+  background: var(--accent, var(--fg-1));
+  color: #fff;
+  border-color: transparent;
+  margin-top: 6px;
+}
+
+/* ============ SEARCH FILTERS ============ */
+.search-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.search-range {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+.search-range::-webkit-scrollbar {
+  display: none;
+}
+.search-range .chip {
+  flex: 0 0 auto;
+}
+
 /* ============ CALENDAR ============ */
 .calendar-card,
 .cattrend-card {
