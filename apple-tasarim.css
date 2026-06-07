@@ -1306,6 +1306,97 @@ html[data-theme="dark"] .tab.active {
   font-weight: 600;
   color: var(--accent, var(--fg-1));
 }
+
+/* ============ GOALS ============ */
+.goal-card {
+  background: var(--bg-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card-sm);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.goal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 9px;
+}
+.goal-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fg-1);
+}
+.goal-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.goal-bar {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+.goal-fill {
+  height: 100%;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent, var(--pos));
+  transition: width 0.5s var(--ease-spring);
+}
+.goal-fill.done {
+  background: var(--pos);
+}
+.goal-meta {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.goal-actions,
+.debt-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.mini-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--r-input);
+  background: var(--hairline);
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+}
+.mini-btn.danger {
+  color: var(--neg);
+  background: var(--neg-bg);
+}
+
+/* ============ DEBTS ============ */
+.debt-item {
+  background: var(--bg-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card-sm);
+  box-shadow: var(--shadow-card);
+  padding: 4px 12px 12px;
+  margin-bottom: 10px;
+}
+.debt-item.settled {
+  opacity: 0.55;
+}
+.debt-item.settled .row-amount {
+  text-decoration: line-through;
+}
+.debt-item .row {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+}
 .trend-chart {
   position: relative;
   height: 100px;

@@ -59,8 +59,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
-    <link rel="stylesheet" href="../apple-tasarim.css?v=34" />
-    <link rel="preload" as="script" href="app.js?v=34" />
+    <link rel="stylesheet" href="../apple-tasarim.css?v=35" />
+    <link rel="preload" as="script" href="app.js?v=35" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -881,6 +881,28 @@
         </section>
 
         <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Hedefler & Borçlar</div>
+          <div class="card">
+            <button type="button" class="settings-row" id="open-goals">
+              <div class="ic goal" data-icon="trend"></div>
+              <div>
+                <div class="label">Birikim Hedefleri</div>
+                <div class="sub">İlerleme çubuğuyla takip et</div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
+            <button type="button" class="settings-row" id="open-debts">
+              <div class="ic debt" data-icon="wallet"></div>
+              <div>
+                <div class="label">Borçlar</div>
+                <div class="sub">Kim kime borçlu, net durum</div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="section" style="padding-left: 0; padding-right: 0">
           <div class="section-title">Yedekleme</div>
           <div class="card">
             <button type="button" class="settings-row" id="export-btn">
@@ -950,6 +972,112 @@
       hidden
     />
     <input type="file" id="import-csv-file" accept="text/csv,.csv" hidden />
+
+    <!-- Goals sheet -->
+    <div
+      class="sheet"
+      id="sheet-goals"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="goals-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>Kapat</button>
+        <h2 class="title" id="goals-title">Birikim Hedefleri</h2>
+        <span></span>
+      </header>
+      <div class="sheet-body">
+        <div id="goals-list"></div>
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Yeni Hedef</div>
+          <div class="field">
+            <div class="field-label">Hedef Adı</div>
+            <input
+              type="text"
+              id="goal-label"
+              class="input"
+              placeholder="Örn. Tatil fonu"
+            />
+          </div>
+          <div class="field">
+            <div class="field-label">Hedef Tutar</div>
+            <input
+              type="text"
+              inputmode="decimal"
+              id="goal-target"
+              class="input"
+              placeholder="0"
+            />
+          </div>
+          <button type="button" class="tx-secondary-btn" id="goal-add">
+            + Hedef Ekle
+          </button>
+        </section>
+      </div>
+    </div>
+
+    <!-- Debts sheet -->
+    <div
+      class="sheet"
+      id="sheet-debts"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="debts-title"
+    >
+      <div class="sheet-grabber" aria-hidden="true"></div>
+      <header class="sheet-head">
+        <button class="sheet-action left" data-sheet-close>Kapat</button>
+        <h2 class="title" id="debts-title">Borçlar</h2>
+        <span></span>
+      </header>
+      <div class="sheet-body">
+        <div
+          class="trend-meta"
+          id="debts-summary"
+          style="padding: 0 2px 10px"
+        ></div>
+        <div id="debts-list"></div>
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Yeni Kayıt</div>
+          <div class="seg" style="--n: 2">
+            <span class="seg-thumb" id="debt-dir-thumb"></span>
+            <button
+              type="button"
+              class="seg-opt active"
+              data-debt-dir="owedToMe"
+            >
+              Bana borçlu
+            </button>
+            <button type="button" class="seg-opt" data-debt-dir="iOwe">
+              Borçluyum
+            </button>
+          </div>
+          <div class="field">
+            <div class="field-label">İsim / Açıklama</div>
+            <input
+              type="text"
+              id="debt-label"
+              class="input"
+              placeholder="Örn. Ali — yemek"
+            />
+          </div>
+          <div class="field">
+            <div class="field-label">Tutar</div>
+            <input
+              type="text"
+              inputmode="decimal"
+              id="debt-amount"
+              class="input"
+              placeholder="0"
+            />
+          </div>
+          <button type="button" class="tx-secondary-btn" id="debt-add">
+            + Ekle
+          </button>
+        </section>
+      </div>
+    </div>
 
     <!-- Recurring transactions sheet -->
     <div
@@ -1229,6 +1357,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=34" defer></script>
+    <script src="app.js?v=35" defer></script>
   </body>
 </html>

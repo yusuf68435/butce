@@ -154,7 +154,7 @@ const APP_PLUS_EXPORTS =
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
-  normalizeTags,
+  normalizeTags, goalProgress, debtsNet,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -483,6 +483,30 @@ test("normalizeTags: caps count at 8 and drops over-long tags", () => {
   const many = Array.from({ length: 12 }, (_, i) => "t" + i).join(",");
   assert.equal(sandbox.normalizeTags(many).length, 8);
   assert.deepEqual(plain(sandbox.normalizeTags("a".repeat(40))), []);
+});
+
+test("goalProgress clamps between 0 and 100", () => {
+  assert.equal(sandbox.goalProgress(0, 1000), 0);
+  assert.equal(sandbox.goalProgress(500, 1000), 50);
+  assert.equal(sandbox.goalProgress(1500, 1000), 100); // over-funded → capped
+  assert.equal(sandbox.goalProgress(-50, 1000), 0); // negative → floored
+  assert.equal(sandbox.goalProgress(100, 0), 0); // no target → 0
+});
+
+test("debtsNet sums by direction and ignores settled", () => {
+  const net = sandbox.debtsNet([
+    { direction: "owedToMe", amount: 1000 },
+    { direction: "owedToMe", amount: 500, settled: true }, // ignored
+    { direction: "iOwe", amount: 300 },
+  ]);
+  assert.equal(net.owedToMe, 1000);
+  assert.equal(net.iOwe, 300);
+  assert.equal(net.net, 700);
+  assert.deepEqual(plain(sandbox.debtsNet([])), {
+    owedToMe: 0,
+    iOwe: 0,
+    net: 0,
+  });
 });
 
 // Run

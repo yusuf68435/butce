@@ -801,6 +801,23 @@ function normalizeTags(input) {
   }
   return out;
 }
+/** Goal completion as a clamped 0–100 percentage. */
+function goalProgress(saved, target) {
+  if (!target || target <= 0) return 0;
+  return Math.max(0, Math.min(100, ((Number(saved) || 0) / target) * 100));
+}
+/** Net debt position from a debts list (ignores settled rows). */
+function debtsNet(debts) {
+  let owedToMe = 0;
+  let iOwe = 0;
+  for (const d of debts || []) {
+    if (d.settled) continue;
+    const amt = Number(d.amount) || 0;
+    if (d.direction === "owedToMe") owedToMe += amt;
+    else iOwe += amt;
+  }
+  return { owedToMe, iOwe, net: owedToMe - iOwe };
+}
 function parseAmount(input) {
   if (typeof input !== "string") input = String(input ?? "");
   const cleaned = input
@@ -1093,6 +1110,322 @@ const Recurring = (() => {
         renderCats();
       });
     });
+  }
+
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   GOALS — savings goals with progress
+   ========================================================================== */
+
+const Goals = (() => {
+  function open() {
+    renderList();
+    Sheets.open("sheet-goals");
+  }
+
+  function renderList() {
+    const root = $("#goals-list");
+    if (!root) return;
+    clear(root);
+    const goals = Store.state.goals || [];
+    if (!goals.length) {
+      root.appendChild(
+        emptyEl("trend", "Henüz hedef yok", "Aşağıdan bir birikim hedefi ekle"),
+      );
+      hydrateIcons(root);
+      return;
+    }
+    for (const g of goals) {
+      const pct = goalProgress(g.saved, g.target);
+      const card = el("div", { class: "goal-card" });
+      const head = el("div", { class: "goal-head" });
+      head.appendChild(el("div", { class: "goal-label" }, g.label));
+      head.appendChild(el("div", { class: "goal-pct" }, `%${pct.toFixed(0)}`));
+      card.appendChild(head);
+      const bar = el("div", { class: "goal-bar" });
+      const fill = el("div", {
+        class: `goal-fill${pct >= 100 ? " done" : ""}`,
+      });
+      bar.appendChild(fill);
+      card.appendChild(bar);
+      requestAnimationFrame(() => {
+        fill.style.width = pct + "%";
+      });
+      card.appendChild(
+        el(
+          "div",
+          { class: "goal-meta" },
+          `${fmt.try(g.saved)} / ${fmt.try(g.target)}`,
+        ),
+      );
+      const actions = el("div", { class: "goal-actions" });
+      actions.appendChild(
+        el(
+          "button",
+          {
+            type: "button",
+            class: "mini-btn",
+            onclick: () => contribute(g.id),
+          },
+          "+ Katkı",
+        ),
+      );
+      actions.appendChild(
+        el(
+          "button",
+          {
+            type: "button",
+            class: "mini-btn danger",
+            onclick: () => remove(g.id),
+          },
+          "Sil",
+        ),
+      );
+      card.appendChild(actions);
+      root.appendChild(card);
+    }
+    hydrateIcons(root);
+  }
+
+  function add() {
+    const label = $("#goal-label").value.trim();
+    const target = parseAmount($("#goal-target").value);
+    if (!label) {
+      Toast.show("Hedef adı gerekli", "error");
+      return;
+    }
+    if (!target || target <= 0) {
+      Toast.show("Geçerli bir hedef tutarı gir", "error");
+      return;
+    }
+    Store.update((s) => {
+      s.goals = s.goals || [];
+      s.goals.push({
+        id: uid(),
+        label,
+        target,
+        saved: 0,
+        createdAt: todayISO(),
+      });
+    });
+    $("#goal-label").value = "";
+    $("#goal-target").value = "";
+    Haptics.light();
+    renderList();
+  }
+
+  async function contribute(id) {
+    const v = await Prompt.show({
+      title: "Katkı Ekle",
+      label: "Eklenecek tutar (eksi de olabilir)",
+      placeholder: "0",
+    });
+    if (v === null) return;
+    const amount = parseAmount(v);
+    if (!amount) return;
+    Store.update((s) => {
+      const g = (s.goals || []).find((x) => x.id === id);
+      if (g) g.saved = Math.max(0, (Number(g.saved) || 0) + amount);
+    });
+    renderList();
+  }
+
+  async function remove(id) {
+    const g = (Store.state.goals || []).find((x) => x.id === id);
+    const ok = await Confirm.show({
+      title: "Hedef silinsin mi?",
+      message: g?.label || "",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      s.goals = (s.goals || []).filter((x) => x.id !== id);
+    });
+    renderList();
+  }
+
+  function bind() {
+    const ob = $("#open-goals");
+    if (ob) ob.addEventListener("click", open);
+    const ab = $("#goal-add");
+    if (ab) ab.addEventListener("click", add);
+  }
+
+  return { open, bind };
+})();
+
+/* ==========================================================================
+   DEBTS — who owes whom (net position)
+   ========================================================================== */
+
+const Debts = (() => {
+  let addDir = "owedToMe";
+
+  function open() {
+    renderDirSeg();
+    renderList();
+    Sheets.open("sheet-debts");
+  }
+
+  function renderDirSeg() {
+    $$("[data-debt-dir]", $("#sheet-debts")).forEach((b) => {
+      const on = b.dataset.debtDir === addDir;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    setSegThumb("#sheet-debts .seg", addDir === "owedToMe" ? 0 : 1);
+  }
+
+  function renderList() {
+    const root = $("#debts-list");
+    if (!root) return;
+    const debts = Store.state.debts || [];
+    const net = debtsNet(debts);
+    const sumEl = $("#debts-summary");
+    if (sumEl) {
+      clear(sumEl);
+      sumEl.appendChild(el("span", { class: "label" }, "Net durum"));
+      sumEl.appendChild(
+        el(
+          "span",
+          { class: `delta ${net.net >= 0 ? "pos" : "neg"}` },
+          fmt.signed(net.net),
+        ),
+      );
+    }
+    clear(root);
+    if (!debts.length) {
+      root.appendChild(
+        emptyEl("wallet", "Borç kaydı yok", "Kim kime borçlu, aşağıdan ekle"),
+      );
+      hydrateIcons(root);
+      return;
+    }
+    for (const d of debts) {
+      const dirLabel = d.direction === "owedToMe" ? "Bana borçlu" : "Borçluyum";
+      const row = el("div", { class: "row" });
+      row.appendChild(
+        el("span", {
+          class: `row-icon ${d.direction === "owedToMe" ? "income" : "expense"}`,
+          "data-icon": "wallet",
+        }),
+      );
+      const text = el("div", { class: "row-text" });
+      text.appendChild(el("div", { class: "row-title" }, d.label));
+      text.appendChild(
+        el(
+          "div",
+          { class: "row-sub" },
+          dirLabel + (d.settled ? " · kapandı" : ""),
+        ),
+      );
+      row.appendChild(text);
+      row.appendChild(
+        el(
+          "div",
+          {
+            class: `row-amount ${d.direction === "owedToMe" ? "pos" : "neg"}`,
+          },
+          fmt.try(d.amount),
+        ),
+      );
+      const actions = el(
+        "div",
+        { class: "debt-actions" },
+        el(
+          "button",
+          {
+            type: "button",
+            class: "mini-btn",
+            onclick: () => toggleSettled(d.id),
+          },
+          d.settled ? "Yeniden aç" : "Kapat",
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            class: "mini-btn danger",
+            onclick: () => remove(d.id),
+          },
+          "Sil",
+        ),
+      );
+      root.appendChild(
+        el(
+          "div",
+          { class: `debt-item${d.settled ? " settled" : ""}` },
+          row,
+          actions,
+        ),
+      );
+    }
+    hydrateIcons(root);
+  }
+
+  function add() {
+    const label = $("#debt-label").value.trim();
+    const amount = parseAmount($("#debt-amount").value);
+    if (!label) {
+      Toast.show("İsim/açıklama gerekli", "error");
+      return;
+    }
+    if (!amount || amount <= 0) {
+      Toast.show("Geçerli bir tutar gir", "error");
+      return;
+    }
+    Store.update((s) => {
+      s.debts = s.debts || [];
+      s.debts.push({
+        id: uid(),
+        label,
+        amount,
+        direction: addDir,
+        settled: false,
+        createdAt: todayISO(),
+      });
+    });
+    $("#debt-label").value = "";
+    $("#debt-amount").value = "";
+    Haptics.light();
+    renderList();
+  }
+
+  function toggleSettled(id) {
+    Store.update((s) => {
+      const d = (s.debts || []).find((x) => x.id === id);
+      if (d) d.settled = !d.settled;
+    });
+    renderList();
+  }
+
+  async function remove(id) {
+    const ok = await Confirm.show({
+      title: "Kayıt silinsin mi?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
+    Store.update((s) => {
+      s.debts = (s.debts || []).filter((x) => x.id !== id);
+    });
+    renderList();
+  }
+
+  function bind() {
+    const ob = $("#open-debts");
+    if (ob) ob.addEventListener("click", open);
+    const ab = $("#debt-add");
+    if (ab) ab.addEventListener("click", add);
+    $$("[data-debt-dir]").forEach((b) =>
+      b.addEventListener("click", () => {
+        addDir = b.dataset.debtDir;
+        renderDirSeg();
+      }),
+    );
   }
 
   return { open, bind };
@@ -5340,6 +5673,8 @@ function init() {
   DatePicker.bind();
   Budgets.bind();
   Recurring.bind();
+  Goals.bind();
+  Debts.bind();
   SearchPalette.bind();
 
   // Apply any due recurring rules — defer to idle so it doesn't block first paint
