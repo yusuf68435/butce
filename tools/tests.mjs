@@ -155,6 +155,7 @@ const APP_PLUS_EXPORTS =
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
   normalizeTags, goalProgress, debtsNet, collectDueReminders, tagSpending,
+  AppLock,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -536,6 +537,27 @@ test("tagSpending sums expense amounts per tag, ignores income/untagged", () => 
   assert.equal(by.mutfak, 150);
   assert.equal(by["haftalık"], 100);
   assert.equal(Object.keys(by).length, 2);
+});
+
+test("AppLock.hash: deterministic for same pin+salt, differs for wrong pin", async () => {
+  const a = await sandbox.AppLock.hash("1234");
+  const b = await sandbox.AppLock.hash("1234", a.salt);
+  assert.equal(b.hash, a.hash);
+  const c = await sandbox.AppLock.hash("9999", a.salt);
+  assert.notEqual(c.hash, a.hash);
+});
+
+test("AppLock.verify: accepts correct PIN, rejects wrong, open when no lock", async () => {
+  const { salt, hash } = await sandbox.AppLock.hash("4321");
+  sandbox.Store.update((s) => {
+    s.settings.lock = { enabled: true, salt, hash, len: 4 };
+  });
+  assert.equal(await sandbox.AppLock.verify("4321"), true);
+  assert.equal(await sandbox.AppLock.verify("0000"), false);
+  sandbox.Store.update((s) => {
+    delete s.settings.lock;
+  });
+  assert.equal(await sandbox.AppLock.verify("whatever"), true);
 });
 
 // Run

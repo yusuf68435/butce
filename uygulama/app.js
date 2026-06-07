@@ -5019,6 +5019,234 @@ const BackupCrypto = (() => {
 })();
 
 /* ==========================================================================
+   APP LOCK — PIN gate (PBKDF2 hash, keypad unlock)
+   ========================================================================== */
+
+const AppLock = (() => {
+  let buffer = "";
+  let targetLen = 4;
+  let onUnlock = null;
+
+  function bufToB64(buf) {
+    const b = new Uint8Array(buf);
+    let s = "";
+    const C = 0x8000;
+    for (let i = 0; i < b.length; i += C) {
+      s += String.fromCharCode.apply(null, b.subarray(i, i + C));
+    }
+    return btoa(s);
+  }
+  function b64ToBuf(str) {
+    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+  }
+
+  /** Derive a salted PBKDF2 hash of the PIN. */
+  async function hash(pin, saltB64) {
+    const salt = saltB64
+      ? b64ToBuf(saltB64)
+      : crypto.getRandomValues(new Uint8Array(16));
+    const base = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(pin),
+      "PBKDF2",
+      false,
+      ["deriveBits"],
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: PBKDF2_ITERS, hash: "SHA-256" },
+      base,
+      256,
+    );
+    return { salt: bufToB64(salt), hash: bufToB64(bits) };
+  }
+
+  function supported() {
+    return typeof crypto !== "undefined" && !!crypto.subtle;
+  }
+  function isEnabled() {
+    const lock = Store.state.settings.lock;
+    return !!(lock && lock.enabled);
+  }
+  async function verify(pin) {
+    const lock = Store.state.settings.lock;
+    if (!lock || !lock.enabled) return true;
+    const { hash: h } = await hash(pin, lock.salt);
+    return h === lock.hash;
+  }
+
+  async function setup() {
+    if (!supported()) {
+      Toast.show("Bu tarayıcıda kilit desteklenmiyor", "error");
+      return false;
+    }
+    const pin1 = await Prompt.show({
+      title: "Yeni PIN",
+      label: "4-6 haneli PIN belirle",
+      placeholder: "••••",
+    });
+    if (pin1 === null) return false;
+    if (!/^\d{4,6}$/.test(pin1)) {
+      Toast.show("PIN 4-6 rakam olmalı", "error");
+      return false;
+    }
+    const pin2 = await Prompt.show({
+      title: "PIN'i Onayla",
+      label: "Tekrar gir",
+      placeholder: "••••",
+    });
+    if (pin2 === null) return false;
+    if (pin1 !== pin2) {
+      Toast.show("PIN'ler eşleşmedi", "error");
+      return false;
+    }
+    const { salt, hash: h } = await hash(pin1);
+    Store.update((s) => {
+      s.settings.lock = { enabled: true, salt, hash: h, len: pin1.length };
+    });
+    Toast.show("Uygulama kilidi açık", "success");
+    return true;
+  }
+
+  async function disable() {
+    const pin = await Prompt.show({
+      title: "PIN'i Gir",
+      label: "Kilidi kaldırmak için mevcut PIN",
+      placeholder: "••••",
+    });
+    if (pin === null) return false;
+    if (!(await verify(pin))) {
+      Toast.show("PIN yanlış", "error");
+      return false;
+    }
+    Store.update((s) => {
+      delete s.settings.lock;
+    });
+    Toast.show("Kilit kaldırıldı", "info");
+    return true;
+  }
+
+  function renderDots() {
+    const dots = $("#lock-dots");
+    if (!dots) return;
+    clear(dots);
+    for (let i = 0; i < targetLen; i++) {
+      dots.appendChild(
+        el("span", { class: `lock-dot${i < buffer.length ? " on" : ""}` }),
+      );
+    }
+  }
+
+  function buildPad() {
+    const pad = $("#lock-pad");
+    if (!pad || pad._built) return;
+    pad._built = true;
+    const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
+    for (const k of keys) {
+      if (k === "") {
+        pad.appendChild(el("span", { class: "lock-key empty" }));
+        continue;
+      }
+      pad.appendChild(
+        el(
+          "button",
+          { type: "button", class: "lock-key", onclick: () => press(k) },
+          k,
+        ),
+      );
+    }
+  }
+
+  async function press(k) {
+    Haptics.light();
+    if (k === "⌫") {
+      buffer = buffer.slice(0, -1);
+      renderDots();
+      return;
+    }
+    if (buffer.length >= targetLen) return;
+    buffer += k;
+    renderDots();
+    if (buffer.length === targetLen) {
+      if (await verify(buffer)) unlockSuccess();
+      else fail();
+    }
+  }
+
+  function fail() {
+    const box = $("#lock-box");
+    if (box) {
+      box.classList.remove("shake");
+      void box.offsetWidth; // reflow to restart the animation
+      box.classList.add("shake");
+    }
+    Haptics.warning();
+    buffer = "";
+    renderDots();
+    const sub = $("#lock-sub");
+    if (sub) sub.textContent = "Yanlış PIN, tekrar dene";
+  }
+
+  function unlockSuccess() {
+    const screen = $("#lock-screen");
+    if (screen) screen.hidden = true;
+    document.body.classList.remove("locked");
+    buffer = "";
+    Haptics.medium();
+    if (onUnlock) {
+      const f = onUnlock;
+      onUnlock = null;
+      f();
+    }
+  }
+
+  function show(cb) {
+    onUnlock = cb || null;
+    buffer = "";
+    targetLen = Store.state.settings.lock?.len || 4;
+    const screen = $("#lock-screen");
+    if (!screen) return;
+    buildPad();
+    renderDots();
+    const sub = $("#lock-sub");
+    if (sub) sub.textContent = "PIN'ini gir";
+    screen.hidden = false;
+    document.body.classList.add("locked");
+    hydrateIcons(screen);
+  }
+
+  function maybeLock() {
+    if (isEnabled()) show();
+  }
+
+  function syncToggle() {
+    const toggle = $("#lock-toggle");
+    if (!toggle) return;
+    toggle.setAttribute("aria-pressed", String(isEnabled()));
+    const sub = $("#lock-toggle-sub");
+    if (sub) {
+      sub.textContent = isEnabled()
+        ? "Açık — açılışta PIN sorulur"
+        : "Açılışta PIN iste";
+    }
+  }
+
+  function bind() {
+    const toggle = $("#lock-toggle");
+    if (!toggle) return;
+    syncToggle();
+    toggle.addEventListener("click", async () => {
+      if (isEnabled()) {
+        if (await disable()) syncToggle();
+      } else {
+        if (await setup()) syncToggle();
+      }
+    });
+  }
+
+  return { isEnabled, verify, hash, setup, disable, maybeLock, bind };
+})();
+
+/* ==========================================================================
    SETTINGS
    ========================================================================== */
 
@@ -5773,6 +6001,7 @@ function init() {
   Lang.init();
   Privacy.init();
   hydrateIcons();
+  AppLock.maybeLock(); // gate the app before anything else paints
   autoLabelInputs();
   bindTopbarScrollBlur();
   bindHeroTilt();
@@ -5810,6 +6039,7 @@ function init() {
   Recurring.bind();
   Goals.bind();
   Debts.bind();
+  AppLock.bind();
   SearchPalette.bind();
 
   // Apply any due recurring rules — defer to idle so it doesn't block first paint

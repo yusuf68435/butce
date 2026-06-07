@@ -59,8 +59,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
-    <link rel="stylesheet" href="../apple-tasarim.css?v=35" />
-    <link rel="preload" as="script" href="app.js?v=35" />
+    <link rel="stylesheet" href="../apple-tasarim.css?v=36" />
+    <link rel="preload" as="script" href="app.js?v=36" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -358,6 +358,17 @@
     <!-- ============================================================
          SHEETS (scrim + sheet pattern)
          ============================================================ -->
+    <!-- App lock screen -->
+    <div class="lock-screen" id="lock-screen" hidden>
+      <div class="lock-box" id="lock-box">
+        <span class="lock-icon" data-icon="key" aria-hidden="true"></span>
+        <div class="lock-title">Bütçe Kilitli</div>
+        <div class="lock-sub" id="lock-sub">PIN'ini gir</div>
+        <div class="lock-dots" id="lock-dots"></div>
+        <div class="lock-pad" id="lock-pad"></div>
+      </div>
+    </div>
+
     <div class="scrim" id="scrim" aria-hidden="true"></div>
 
     <!-- Transaction sheet -->
@@ -787,6 +798,19 @@
                 <div class="sub" id="privacy-sub">
                   Tutarları yıldız (•••) olarak göster
                 </div>
+              </div>
+              <span class="switch" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              class="settings-row"
+              id="lock-toggle"
+              aria-pressed="false"
+            >
+              <div class="ic lock" data-icon="key"></div>
+              <div>
+                <div class="label">Uygulama Kilidi</div>
+                <div class="sub" id="lock-toggle-sub">Açılışta PIN iste</div>
               </div>
               <span class="switch" aria-hidden="true"></span>
             </button>
@@ -1366,6 +1390,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=35" defer></script>
+    <script src="app.js?v=36" defer></script>
   </body>
 </html>
