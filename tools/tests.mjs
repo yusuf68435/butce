@@ -154,7 +154,7 @@ const APP_PLUS_EXPORTS =
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
-  normalizeTags, goalProgress, debtsNet, collectDueReminders,
+  normalizeTags, goalProgress, debtsNet, collectDueReminders, tagSpending,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -524,6 +524,18 @@ test("collectDueReminders: due/overdue debts + pending, ignores settled/future",
   const due = sandbox.collectDueReminders(debts, pending, "2026-06-07");
   const ids = due.map((x) => x.id).sort();
   assert.deepEqual(plain(ids), ["d1", "p1"]);
+});
+
+test("tagSpending sums expense amounts per tag, ignores income/untagged", () => {
+  const by = sandbox.tagSpending([
+    { type: "expense", amount: 100, tags: ["mutfak", "haftalık"] },
+    { type: "expense", amount: 50, tags: ["mutfak"] },
+    { type: "income", amount: 999, tags: ["mutfak"] }, // income ignored
+    { type: "expense", amount: 30 }, // untagged ignored
+  ]);
+  assert.equal(by.mutfak, 150);
+  assert.equal(by["haftalık"], 100);
+  assert.equal(Object.keys(by).length, 2);
 });
 
 // Run

@@ -1401,6 +1401,97 @@ html[data-theme="dark"] .tab.active {
   color: var(--neg);
   font-weight: 600;
 }
+
+/* ============ BUDGET PROGRESS ============ */
+.budget-item {
+  padding: 4px 0 12px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.budget-item:last-child {
+  border-bottom: none;
+}
+.budget-prog {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding-left: 22px;
+}
+.budget-bar {
+  flex: 1;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+.budget-fill {
+  height: 100%;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: var(--pos);
+  transition: width 0.5s var(--ease-spring);
+}
+.budget-fill.warn {
+  background: var(--warn);
+}
+.budget-fill.over {
+  background: var(--neg);
+}
+.budget-prog-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.budget-prog-meta.over {
+  color: var(--neg);
+}
+
+/* ============ TAG REPORT ============ */
+.tagrep-card {
+  background: var(--bg-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card-sm);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.tagrep-row {
+  display: grid;
+  grid-template-columns: minmax(60px, 28%) 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.tagrep-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tagrep-bar {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+.tagrep-fill {
+  height: 100%;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent, var(--fg-2));
+  transition: width 0.5s var(--ease-spring);
+}
+.tagrep-amt {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-1);
+  font-variant-numeric: tabular-nums;
+}
 .trend-chart {
   position: relative;
   height: 100px;

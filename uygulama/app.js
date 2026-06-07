@@ -801,6 +801,18 @@ function normalizeTags(input) {
   }
   return out;
 }
+/** Total expense amount per tag across a transaction list. */
+function tagSpending(list) {
+  const by = Object.create(null);
+  for (const tx of list || []) {
+    if (tx.type !== "expense" || !Array.isArray(tx.tags)) continue;
+    for (const tg of tx.tags) {
+      by[tg] = (by[tg] || 0) + (Number(tx.amount) || 0);
+    }
+  }
+  return by;
+}
+
 /** Goal completion as a clamped 0–100 percentage. */
 function goalProgress(saved, target) {
   if (!target || target <= 0) return 0;
@@ -1481,9 +1493,9 @@ const Budgets = (() => {
     clear(root);
     const cats = Store.state.categories.expense;
     cats.forEach((cat, i) => {
-      const meta = categoryMeta(cat);
       const color = CHART_PALETTE[i % CHART_PALETTE.length];
       const current = Store.state.budgets?.[cat] || 0;
+      const item = el("div", { class: "budget-item" });
       const row = el("div", { class: "budget-row" });
       row.appendChild(
         el("span", { class: "dot", style: `background:${color}` }),
@@ -1504,9 +1516,35 @@ const Budgets = (() => {
           if (v > 0) s.budgets[cat] = v;
           else delete s.budgets[cat];
         });
+        render(); // refresh the spent/limit bars
       });
       row.appendChild(input);
-      root.appendChild(row);
+      item.appendChild(row);
+
+      // Spent/limit progress for the viewed month (only when a limit is set)
+      if (current > 0) {
+        const spent = budgetSpent(cat, viewMonth);
+        const pct = Math.min(100, (spent / current) * 100);
+        const state = spent > current ? " over" : pct > 90 ? " warn" : "";
+        const bar = el("div", { class: "budget-bar" });
+        const fill = el("div", { class: `budget-fill${state}` });
+        bar.appendChild(fill);
+        const prog = el(
+          "div",
+          { class: "budget-prog" },
+          bar,
+          el(
+            "div",
+            { class: `budget-prog-meta${state}` },
+            `${fmt.try(spent)} / ${fmt.try(current)}`,
+          ),
+        );
+        item.appendChild(prog);
+        requestAnimationFrame(() => {
+          fill.style.width = pct + "%";
+        });
+      }
+      root.appendChild(item);
     });
   }
   function bind() {
@@ -2692,6 +2730,7 @@ function renderCash() {
   renderTemplates();
   renderWealth();
   renderInsights();
+  renderTagReport();
   renderTrend();
   renderHeatmap();
   renderExpenseChart(t.list);
@@ -2929,6 +2968,39 @@ function renderInsights() {
   }
 
   hydrateIcons(card);
+}
+
+const TAG_REPORT_MAX = 6;
+
+/** Render top tags by expense for the viewed month (hidden when no tags). */
+function renderTagReport() {
+  const section = $("#tags-section");
+  const card = $("#tags-card");
+  if (!section || !card) return;
+  const list = totalsOf(viewMonth).list;
+  const by = tagSpending(list);
+  const entries = Object.entries(by).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  clear(card);
+  const max = entries[0][1] || 1;
+  for (const [tag, amount] of entries.slice(0, TAG_REPORT_MAX)) {
+    const pct = Math.max(4, (amount / max) * 100);
+    const row = el("div", { class: "tagrep-row" });
+    row.appendChild(el("div", { class: "tagrep-name" }, tag));
+    const bar = el("div", { class: "tagrep-bar" });
+    const fill = el("div", { class: "tagrep-fill" });
+    bar.appendChild(fill);
+    row.appendChild(bar);
+    row.appendChild(el("div", { class: "tagrep-amt" }, fmt.try(amount)));
+    card.appendChild(row);
+    requestAnimationFrame(() => {
+      fill.style.width = pct + "%";
+    });
+  }
 }
 
 /* ==========================================================================
