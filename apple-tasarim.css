@@ -1579,6 +1579,153 @@ body.locked {
 .lock-box.shake {
   animation: lockShake 0.4s;
 }
+
+/* ============ CALENDAR ============ */
+.calendar-card,
+.cattrend-card {
+  background: var(--bg-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card-sm);
+  box-shadow: var(--shadow-card);
+  padding: 14px;
+}
+.calendar-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-2);
+  margin-bottom: 10px;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.cal-head {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-3);
+  padding-bottom: 2px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  border-radius: 9px;
+  background: var(--hairline);
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  color: var(--fg-1);
+  transition: transform 0.12s var(--ease-spring);
+}
+.cal-cell:active {
+  transform: scale(0.9);
+}
+.cal-cell.empty {
+  background: transparent;
+  pointer-events: none;
+}
+.cal-day {
+  font-size: 12px;
+  font-weight: 600;
+}
+.cal-amt {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.cal-cell[data-level="1"] {
+  background: rgba(229, 54, 78, 0.12);
+}
+.cal-cell[data-level="2"] {
+  background: rgba(229, 54, 78, 0.26);
+}
+.cal-cell[data-level="3"] {
+  background: rgba(229, 54, 78, 0.44);
+  color: #fff;
+}
+.cal-cell[data-level="4"] {
+  background: rgba(229, 54, 78, 0.66);
+  color: #fff;
+}
+.cal-cell[data-level="3"] .cal-amt,
+.cal-cell[data-level="4"] .cal-amt {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* ============ CATEGORY TREND ============ */
+.cattrend-chips {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+.cattrend-chips::-webkit-scrollbar {
+  display: none;
+}
+.cattrend-chips .chip {
+  flex: 0 0 auto;
+}
+
+/* ============ PRINT REPORT ============ */
+#print-report {
+  display: none;
+}
+@media print {
+  body > * {
+    display: none !important;
+  }
+  body > #print-report {
+    display: block !important;
+    padding: 24px;
+    color: #000;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  #print-report h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  #print-report h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 18px;
+    color: #555;
+  }
+  #print-report h3 {
+    font-size: 14px;
+    margin: 18px 0 6px;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .print-table td {
+    padding: 6px 4px;
+    border-bottom: 1px solid #ddd;
+  }
+  .print-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .print-table tr.strong td {
+    font-weight: 700;
+    border-top: 2px solid #000;
+    border-bottom: none;
+  }
+  .print-foot {
+    margin-top: 22px;
+    font-size: 11px;
+    color: #888;
+  }
+}
 @keyframes lockShake {
   10%,
   90% {

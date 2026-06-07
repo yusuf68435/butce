@@ -155,7 +155,7 @@ const APP_PLUS_EXPORTS =
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
   normalizeTags, goalProgress, debtsNet, collectDueReminders, tagSpending,
-  AppLock,
+  AppLock, monthDailyExpense, categoryMonthlyTrend,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -558,6 +558,32 @@ test("AppLock.verify: accepts correct PIN, rejects wrong, open when no lock", as
     delete s.settings.lock;
   });
   assert.equal(await sandbox.AppLock.verify("whatever"), true);
+});
+
+test("monthDailyExpense: sums expenses by day, ignores income/other months", () => {
+  const by = sandbox.monthDailyExpense("2026-06", [
+    { type: "expense", amount: 100, date: "2026-06-05" },
+    { type: "expense", amount: 50, date: "2026-06-05" },
+    { type: "income", amount: 999, date: "2026-06-05" }, // ignored
+    { type: "expense", amount: 30, date: "2026-05-31" }, // other month
+  ]);
+  assert.equal(by[5], 150);
+  assert.equal(Object.keys(by).length, 1);
+});
+
+test("categoryMonthlyTrend: per-category monthly series of correct length", () => {
+  const tx = [
+    { type: "expense", category: "Market", amount: 200, date: "2026-04-10" },
+    { type: "expense", category: "Market", amount: 300, date: "2026-06-10" },
+    { type: "expense", category: "Kahve", amount: 50, date: "2026-06-10" }, // other cat
+    { type: "income", category: "Market", amount: 999, date: "2026-06-10" }, // income
+  ];
+  const series = sandbox.categoryMonthlyTrend("Market", "2026-06", tx, 3);
+  assert.equal(series.length, 3); // 2026-04, 05, 06
+  assert.equal(series[0].key, "2026-04");
+  assert.equal(series[0].v, 200);
+  assert.equal(series[1].v, 0); // May: nothing
+  assert.equal(series[2].v, 300); // June: only the expense
 });
 
 // Run

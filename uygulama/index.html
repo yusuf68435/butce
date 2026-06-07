@@ -175,6 +175,22 @@
               </div>
             </section>
 
+            <section class="section" id="cattrend-section" hidden>
+              <div class="section-title">Kategori Trendi</div>
+              <div class="cattrend-card">
+                <div class="chips cattrend-chips" id="cattrend-chips"></div>
+                <div class="trend-chart" id="cattrend-chart"></div>
+              </div>
+            </section>
+
+            <section class="section" id="calendar-section">
+              <div class="section-title">Takvim</div>
+              <div class="calendar-card">
+                <div class="calendar-meta" id="calendar-meta"></div>
+                <div class="calendar-grid" id="calendar-grid"></div>
+              </div>
+            </section>
+
             <section class="section" id="heatmap-section">
               <div class="section-title" data-i18n="section.heatmap">
                 Yıllık Yoğunluk
@@ -974,6 +990,14 @@
               </div>
               <span class="chev" data-icon="chevron-right"></span>
             </button>
+            <button type="button" class="settings-row" id="print-report-btn">
+              <div class="ic print" data-icon="doc"></div>
+              <div>
+                <div class="label">Aylık Rapor (Yazdır)</div>
+                <div class="sub">Seçili ayın özetini yazdır / PDF</div>
+              </div>
+              <span class="chev" data-icon="chevron-right"></span>
+            </button>
           </div>
         </section>
 
@@ -1389,6 +1413,9 @@
         />
       </div>
     </div>
+
+    <!-- Printable monthly report (shown only when printing) -->
+    <div id="print-report" aria-hidden="true"></div>
 
     <script src="app.js?v=36" defer></script>
   </body>

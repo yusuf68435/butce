@@ -813,6 +813,40 @@ function tagSpending(list) {
   return by;
 }
 
+/** Daily expense totals { day:number -> amount } for a month. */
+function monthDailyExpense(monthKey, transactions) {
+  const by = Object.create(null);
+  for (const tx of transactions || []) {
+    if (tx.type !== "expense") continue;
+    if (monthKeyOf(tx.date) !== monthKey) continue;
+    const day = Number(tx.date.slice(8, 10));
+    by[day] = (by[day] || 0) + (Number(tx.amount) || 0);
+  }
+  return by;
+}
+
+/** Monthly expense totals for one category over the last `months` (incl. monthKey). */
+function categoryMonthlyTrend(category, monthKey, transactions, months = 6) {
+  const [yy, mm] = monthKey.split("-").map(Number);
+  const out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(yy, mm - 1 - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    let v = 0;
+    for (const tx of transactions || []) {
+      if (
+        tx.type === "expense" &&
+        tx.category === category &&
+        monthKeyOf(tx.date) === key
+      ) {
+        v += Number(tx.amount) || 0;
+      }
+    }
+    out.push({ key, v });
+  }
+  return out;
+}
+
 /** Goal completion as a clamped 0–100 percentage. */
 function goalProgress(saved, target) {
   if (!target || target <= 0) return 0;
@@ -2732,6 +2766,8 @@ function renderCash() {
   renderInsights();
   renderTagReport();
   renderTrend();
+  renderCategoryTrend();
+  renderCalendar();
   renderHeatmap();
   renderExpenseChart(t.list);
   renderTxList(t.list);
@@ -3001,6 +3037,116 @@ function renderTagReport() {
       fill.style.width = pct + "%";
     });
   }
+}
+
+/* ==========================================================================
+   CALENDAR — monthly daily-expense grid (tap a day to add)
+   ========================================================================== */
+
+const TR_WEEKDAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+
+function renderCalendar() {
+  const grid = $("#calendar-grid");
+  const meta = $("#calendar-meta");
+  if (!grid) return;
+  const [yy, mm] = viewMonth.split("-").map(Number);
+  const byDay = monthDailyExpense(viewMonth, Store.state.transactions);
+  const daysInMonth = new Date(yy, mm, 0).getDate();
+  // JS getDay: 0=Sun..6=Sat → convert to Mon=0..Sun=6
+  const firstWeekday = (new Date(yy, mm - 1, 1).getDay() + 6) % 7;
+  const amounts = Object.values(byDay);
+  const max = Math.max(1, ...amounts);
+  const total = amounts.reduce((s, v) => s + v, 0);
+  if (meta) meta.textContent = total ? `Toplam ${fmt.try(total)}` : "Gider yok";
+
+  clear(grid);
+  for (const w of TR_WEEKDAYS) {
+    grid.appendChild(el("div", { class: "cal-head" }, w));
+  }
+  for (let i = 0; i < firstWeekday; i++) {
+    grid.appendChild(el("div", { class: "cal-cell empty" }));
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const amount = byDay[d] || 0;
+    const iso = `${viewMonth}-${String(d).padStart(2, "0")}`;
+    const level = amount === 0 ? 0 : Math.min(4, Math.ceil((amount / max) * 4));
+    const cell = el("button", {
+      type: "button",
+      class: "cal-cell",
+      "data-level": String(level),
+      "aria-label": `${d}: ${fmt.try(amount)}`,
+      onclick: () => TxSheet.open(null, { date: iso }),
+    });
+    cell.appendChild(el("span", { class: "cal-day" }, String(d)));
+    if (amount > 0) {
+      cell.appendChild(el("span", { class: "cal-amt" }, fmt.int(amount)));
+    }
+    grid.appendChild(cell);
+  }
+}
+
+/* ==========================================================================
+   CATEGORY TREND — one category's spend over the last 6 months
+   ========================================================================== */
+
+let _catTrendSel = null;
+
+function renderCategoryTrend() {
+  const section = $("#cattrend-section");
+  const chips = $("#cattrend-chips");
+  const chart = $("#cattrend-chart");
+  if (!section || !chips || !chart) return;
+  const cats = Store.state.categories.expense.filter((c) =>
+    Store.state.transactions.some(
+      (t) => t.type === "expense" && t.category === c,
+    ),
+  );
+  if (!cats.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  if (!_catTrendSel || !cats.includes(_catTrendSel)) _catTrendSel = cats[0];
+
+  clear(chips);
+  for (const c of cats) {
+    chips.appendChild(
+      el(
+        "button",
+        {
+          type: "button",
+          class: `chip${c === _catTrendSel ? " active" : ""}`,
+          onclick: () => {
+            _catTrendSel = c;
+            renderCategoryTrend();
+          },
+        },
+        c,
+      ),
+    );
+  }
+
+  const data = categoryMonthlyTrend(
+    _catTrendSel,
+    viewMonth,
+    Store.state.transactions,
+    6,
+  );
+  const max = Math.max(1, ...data.map((d) => d.v));
+  clear(chart);
+  data.forEach((d, i) => {
+    const [, m] = d.key.split("-").map(Number);
+    const bar = el("div", {
+      class: `trend-bar${i === data.length - 1 ? " current" : ""}`,
+    });
+    const col = el("div", { class: "col" });
+    bar.appendChild(col);
+    bar.appendChild(el("div", { class: "lab" }, TR_MONTHS_SHORT[m - 1]));
+    chart.appendChild(bar);
+    requestAnimationFrame(() => {
+      col.style.height = Math.max(4, (d.v / max) * 80) + "px";
+    });
+  });
 }
 
 /* ==========================================================================
@@ -3979,7 +4125,7 @@ const TxSheet = (() => {
         : "";
       $("#tx-desc").value = prefill?.description || "";
       $("#tx-tags").value = (prefill?.tags || []).join(", ");
-      $("#tx-date").value = todayISO();
+      $("#tx-date").value = prefill?.date || todayISO();
       $("#tx-delete").hidden = true;
     }
     renderSeg();
@@ -5371,6 +5517,43 @@ const Settings = (() => {
       "success",
     );
   }
+
+  /** Build a clean printable monthly summary and open the print dialog. */
+  function printReport() {
+    const month = viewMonth;
+    const tot = totalsOf(month);
+    const cats = Object.entries(expenseByCategory(tot.list)).sort(
+      (a, b) => b[1] - a[1],
+    );
+    const root = $("#print-report");
+    if (!root) return;
+    clear(root);
+    const addRow = (tbl, k, v, cls) => {
+      const tr = el("tr", cls ? { class: cls } : {});
+      tr.appendChild(el("td", {}, k));
+      tr.appendChild(el("td", { class: "num" }, v));
+      tbl.appendChild(tr);
+    };
+    root.appendChild(el("h1", {}, "Bütçe — Aylık Özet"));
+    root.appendChild(el("h2", {}, fmt.monthLabel(month)));
+    const tt = el("table", { class: "print-table" });
+    addRow(tt, "Gelir", fmt.try(tot.income));
+    addRow(tt, "Gider", fmt.try(tot.expense));
+    addRow(tt, "Net", fmt.signed(tot.balance), "strong");
+    root.appendChild(tt);
+    root.appendChild(el("h3", {}, "Kategori Dağılımı"));
+    const ct = el("table", { class: "print-table" });
+    if (cats.length) {
+      for (const [c, a] of cats) addRow(ct, c, fmt.try(a));
+    } else {
+      addRow(ct, "Kayıt yok", "");
+    }
+    root.appendChild(ct);
+    root.appendChild(
+      el("p", { class: "print-foot" }, `Bütçe · ${fmt.date(todayISO())}`),
+    );
+    window.print();
+  }
   /** Overwrite the whole store from an imported state, preserving every key
       (recurring/budgets/goals/debts/templates were silently dropped before). */
   async function applyImportedState(incoming) {
@@ -5622,6 +5805,8 @@ const Settings = (() => {
     if (csvOutBtn) csvOutBtn.addEventListener("click", exportCSV);
     const encBtn = $("#export-enc-btn");
     if (encBtn) encBtn.addEventListener("click", exportEncrypted);
+    const printBtn = $("#print-report-btn");
+    if (printBtn) printBtn.addEventListener("click", printReport);
     $("#reset-btn").addEventListener("click", reset);
     $$("[data-theme-opt]").forEach((b) => {
       b.addEventListener("click", () => Theme.apply(b.dataset.themeOpt));
