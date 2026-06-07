@@ -40,6 +40,8 @@
   --neg: #e5364e;
   --neg-bg: rgba(229, 54, 78, 0.1);
   --warn: #ffb020;
+  /* User-selectable accent (overridden at runtime via settings.accent) */
+  --accent: #0a84ff;
   /* Tinted accent that meets WCAG AA on light surfaces (>= 4.5:1) */
   --accent-fg: #007a5e;
 
@@ -1579,6 +1581,67 @@ body.locked {
 .lock-box.shake {
   animation: lockShake 0.4s;
 }
+.lock-bio {
+  margin-top: 18px;
+  padding: 11px 18px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--accent, var(--fg-1));
+  font-size: 15px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lock-bio svg {
+  width: 18px;
+  height: 18px;
+}
+.settings-row.disabled {
+  opacity: 0.5;
+}
+
+/* ============ ACCENT PICKER ============ */
+.accent-row {
+  align-items: flex-start;
+}
+.accent-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.accent-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+  transition: transform 0.12s var(--ease-spring);
+}
+.accent-swatch:active {
+  transform: scale(0.88);
+}
+.accent-swatch.active {
+  box-shadow:
+    0 0 0 2px var(--bg-2),
+    0 0 0 4px currentColor;
+  color: inherit;
+}
+.accent-swatch.active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--fg-1) 35%, transparent);
+}
 
 /* ============ ONBOARDING ============ */
 .onboard-body {
@@ -1649,6 +1712,17 @@ body.locked {
 }
 .search-range .chip {
   flex: 0 0 auto;
+}
+
+/* ============ NET WORTH SPARK ============ */
+.networth-spark {
+  height: 80px;
+  color: var(--accent, var(--pos));
+}
+.networth-spark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* ============ CALENDAR ============ */
@@ -3133,6 +3207,18 @@ html[data-theme="dark"] .month-cell.active {
   transition:
     opacity 0.32s var(--ease-out),
     transform 0.32s var(--ease-spring);
+}
+.toast .toast-action {
+  margin-left: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  border: none;
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .toast.show {
   opacity: 1;

@@ -59,8 +59,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
-    <link rel="stylesheet" href="../apple-tasarim.css?v=37" />
-    <link rel="preload" as="script" href="app.js?v=37" />
+    <link rel="stylesheet" href="../apple-tasarim.css?v=38" />
+    <link rel="preload" as="script" href="app.js?v=38" />
     <title>Bütçe</title>
   </head>
   <body>
@@ -172,6 +172,14 @@
               <div class="trend-card">
                 <div class="trend-meta" id="trend-meta"></div>
                 <div class="trend-chart" id="trend-chart"></div>
+              </div>
+            </section>
+
+            <section class="section" id="networth-section" hidden>
+              <div class="section-title">Birikim Eğrisi</div>
+              <div class="trend-card">
+                <div class="trend-meta" id="networth-meta"></div>
+                <div class="networth-spark" id="networth-spark"></div>
               </div>
             </section>
 
@@ -382,6 +390,9 @@
         <div class="lock-sub" id="lock-sub">PIN'ini gir</div>
         <div class="lock-dots" id="lock-dots"></div>
         <div class="lock-pad" id="lock-pad"></div>
+        <button type="button" class="lock-bio" id="lock-bio" hidden>
+          <span data-icon="key" aria-hidden="true"></span> Biyometrik ile aç
+        </button>
       </div>
     </div>
 
@@ -800,36 +811,13 @@
                 <button class="seg-opt" data-theme-opt="dark">Koyu</button>
               </div>
             </div>
-            <button
-              type="button"
-              class="settings-row"
-              id="privacy-toggle"
-              aria-pressed="false"
-            >
-              <div class="ic privacy" data-icon="eye"></div>
-              <div>
-                <div class="label" data-i18n="settings.privacy">
-                  Bakiyeyi Gizle
-                </div>
-                <div class="sub" id="privacy-sub">
-                  Tutarları yıldız (•••) olarak göster
-                </div>
+            <div class="settings-row accent-row">
+              <div class="ic accent-ic" data-icon="sparkles"></div>
+              <div class="accent-row-body">
+                <div class="label">Aksan Rengi</div>
+                <div class="accent-swatches" id="accent-swatches"></div>
               </div>
-              <span class="switch" aria-hidden="true"></span>
-            </button>
-            <button
-              type="button"
-              class="settings-row"
-              id="lock-toggle"
-              aria-pressed="false"
-            >
-              <div class="ic lock" data-icon="key"></div>
-              <div>
-                <div class="label">Uygulama Kilidi</div>
-                <div class="sub" id="lock-toggle-sub">Açılışta PIN iste</div>
-              </div>
-              <span class="switch" aria-hidden="true"></span>
-            </button>
+            </div>
             <div class="settings-row">
               <div class="ic lang" data-icon="globe"></div>
               <div>
@@ -870,6 +858,58 @@
                 </div>
               </div>
               <span class="chev" data-icon="chevron-right"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="section" style="padding-left: 0; padding-right: 0">
+          <div class="section-title">Güvenlik & Gizlilik</div>
+          <div class="card">
+            <button
+              type="button"
+              class="settings-row"
+              id="privacy-toggle"
+              aria-pressed="false"
+            >
+              <div class="ic privacy" data-icon="eye"></div>
+              <div>
+                <div class="label" data-i18n="settings.privacy">
+                  Bakiyeyi Gizle
+                </div>
+                <div class="sub" id="privacy-sub">
+                  Tutarları yıldız (•••) olarak göster
+                </div>
+              </div>
+              <span class="switch" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              class="settings-row"
+              id="lock-toggle"
+              aria-pressed="false"
+            >
+              <div class="ic lock" data-icon="key"></div>
+              <div>
+                <div class="label">Uygulama Kilidi</div>
+                <div class="sub" id="lock-toggle-sub">Açılışta PIN iste</div>
+              </div>
+              <span class="switch" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              class="settings-row"
+              id="bio-toggle"
+              aria-pressed="false"
+              hidden
+            >
+              <div class="ic bio" data-icon="key"></div>
+              <div>
+                <div class="label">Biyometrik Kilit</div>
+                <div class="sub" id="bio-toggle-sub">
+                  Face ID / parmak izi ile aç
+                </div>
+              </div>
+              <span class="switch" aria-hidden="true"></span>
             </button>
           </div>
         </section>
@@ -1475,6 +1515,6 @@
     <!-- Printable monthly report (shown only when printing) -->
     <div id="print-report" aria-hidden="true"></div>
 
-    <script src="app.js?v=37" defer></script>
+    <script src="app.js?v=38" defer></script>
   </body>
 </html>

@@ -10,6 +10,7 @@ const OUNCE_TO_GRAM = 31.1035;
 const AGED_DAYS = 60;
 const BACKUP_REMINDER_DAYS = 7;
 const PBKDF2_ITERS = 150000;
+const LOCK_BG_GRACE_MS = 30000; // re-lock if app was backgrounded ≥ this
 
 const TR_MONTHS = [
   "Ocak",
@@ -843,6 +844,27 @@ function categoryMonthlyTrend(category, monthKey, transactions, months = 6) {
       }
     }
     out.push({ key, v });
+  }
+  return out;
+}
+
+/** Running net cash balance at each month-end over the last `months`. */
+function cumulativeBalanceTrend(monthKey, transactions, months = 12) {
+  const [yy, mm] = monthKey.split("-").map(Number);
+  const out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(yy, mm - i, 0); // last day of that month
+    const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    let v = 0;
+    for (const tx of transactions || []) {
+      if ((tx.date || "") <= end) {
+        v += tx.type === "income" ? tx.amount : -tx.amount;
+      }
+    }
+    out.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      v,
+    });
   }
   return out;
 }
@@ -2088,17 +2110,39 @@ const Toast = (() => {
     info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M12 12v4"/></svg>',
   };
 
-  function show(message, kind = "info", { duration = 2400 } = {}) {
+  function show(
+    message,
+    kind = "info",
+    { duration = 2400, action = null } = {},
+  ) {
     const host = $("#toast-host");
     if (!host) return;
     const node = el("div", { class: `toast ${kind}` });
     node.innerHTML = `<span class="toast-icon">${ICONS_INLINE[kind] || ""}</span><span>${escapeText(message)}</span>`;
-    host.appendChild(node);
-    requestAnimationFrame(() => node.classList.add("show"));
-    setTimeout(() => {
+    let dismissTimer = 0;
+    const dismiss = () => {
+      clearTimeout(dismissTimer);
       node.classList.remove("show");
       setTimeout(() => node.remove(), 360);
-    }, duration);
+    };
+    if (action && action.label) {
+      const btn = el(
+        "button",
+        { type: "button", class: "toast-action" },
+        action.label,
+      );
+      btn.addEventListener("click", () => {
+        try {
+          action.onClick?.();
+        } finally {
+          dismiss();
+        }
+      });
+      node.appendChild(btn);
+    }
+    host.appendChild(node);
+    requestAnimationFrame(() => node.classList.add("show"));
+    dismissTimer = setTimeout(dismiss, duration);
   }
 
   function escapeText(s) {
@@ -2766,6 +2810,7 @@ function renderCash() {
   renderInsights();
   renderTagReport();
   renderTrend();
+  renderNetWorth();
   renderCategoryTrend();
   renderCalendar();
   renderHeatmap();
@@ -3150,6 +3195,36 @@ function renderCategoryTrend() {
 }
 
 /* ==========================================================================
+   NET WORTH — cumulative cash balance curve (12 months)
+   ========================================================================== */
+
+function renderNetWorth() {
+  const section = $("#networth-section");
+  const spark = $("#networth-spark");
+  const meta = $("#networth-meta");
+  if (!section || !spark) return;
+  const data = cumulativeBalanceTrend(viewMonth, Store.state.transactions, 12);
+  if (!data.some((d) => d.v !== 0)) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  drawSparkline(spark, data);
+  if (meta) {
+    clear(meta);
+    const delta = data[data.length - 1].v - data[0].v;
+    meta.appendChild(el("span", { class: "label" }, "Kümülatif nakit (12 ay)"));
+    meta.appendChild(
+      el(
+        "span",
+        { class: `delta ${delta >= 0 ? "pos" : "neg"}` },
+        fmt.signed(delta),
+      ),
+    );
+  }
+}
+
+/* ==========================================================================
    HEATMAP — GitHub-style annual expense intensity grid
    ========================================================================== */
 
@@ -3410,6 +3485,34 @@ function renderExpenseChart(list) {
   });
 }
 
+/** Delete a transaction with a 5s "undo" toast; photo cleanup deferred until expiry. */
+function deleteTxWithUndo(tx) {
+  const removed = { ...tx };
+  Store.update((s) => {
+    s.transactions = s.transactions.filter((x) => x.id !== removed.id);
+  });
+  let undone = false;
+  const cleanup = setTimeout(() => {
+    if (!undone && removed.photoId) Photos.remove(removed.photoId);
+  }, 5200);
+  Toast.show(
+    `${removed.category} · ${fmt.try(removed.amount)} silindi`,
+    "info",
+    {
+      duration: 5000,
+      action: {
+        label: "Geri al",
+        onClick: () => {
+          undone = true;
+          clearTimeout(cleanup);
+          Store.update((s) => s.transactions.push(removed));
+          Toast.show("Geri alındı", "success");
+        },
+      },
+    },
+  );
+}
+
 function renderTxList(list) {
   const root = $("#tx-list");
   const prev = captureRects(root);
@@ -3505,23 +3608,9 @@ function renderTxList(list) {
     // Now that the thumb is in the DOM, attach the lazy-loader (observer needs layout)
     if (thumb && t.photoId) lazyLoadThumb(thumb, t.photoId);
 
-    bindSwipeRow(wrap, async () => {
-      const ok = await Confirm.show({
-        title: "Hareket silinsin mi?",
-        message: `${t.category} · ${fmt.try(t.amount)}`,
-        confirmLabel: "Sil",
-        danger: true,
-      });
-      if (!ok) {
-        wrap.classList.remove("armed");
-        return;
-      }
-      // Cleanup attached photo
-      if (t.photoId) await Photos.remove(t.photoId);
-      Store.update((s) => {
-        s.transactions = s.transactions.filter((x) => x.id !== t.id);
-      });
-      Toast.show("Hareket silindi", "success");
+    bindSwipeRow(wrap, () => {
+      // Swipe delete is reversible via the undo toast → no confirm needed.
+      deleteTxWithUndo(t);
     });
   }
   hydrateIcons(root);
@@ -4452,19 +4541,14 @@ const TxSheet = (() => {
     if (!editingId) return;
     const ok = await Confirm.show({
       title: "Hareket silinsin mi?",
-      message: "Bu işlem geri alınamaz.",
+      message: "Silindikten sonra kısa süre geri alabilirsin.",
       confirmLabel: "Sil",
       danger: true,
     });
     if (!ok) return;
-    // Cleanup: remove attached photo too
     const txn = Store.state.transactions.find((x) => x.id === editingId);
-    if (txn?.photoId) await Photos.remove(txn.photoId);
-    Store.update((s) => {
-      s.transactions = s.transactions.filter((t) => t.id !== editingId);
-    });
     Sheets.close("sheet-tx");
-    Toast.show("Hareket silindi", "success");
+    if (txn) deleteTxWithUndo(txn);
   }
 
   /** Persist the current form as a reusable quick-add template. */
@@ -5225,6 +5309,8 @@ const AppLock = (() => {
   let buffer = "";
   let targetLen = 4;
   let onUnlock = null;
+  let hiddenAt = 0;
+  let isShown = false;
 
   function bufToB64(buf) {
     const b = new Uint8Array(buf);
@@ -5390,6 +5476,7 @@ const AppLock = (() => {
     if (screen) screen.hidden = true;
     document.body.classList.remove("locked");
     buffer = "";
+    isShown = false;
     Haptics.medium();
     if (onUnlock) {
       const f = onUnlock;
@@ -5404,17 +5491,109 @@ const AppLock = (() => {
     targetLen = Store.state.settings.lock?.len || 4;
     const screen = $("#lock-screen");
     if (!screen) return;
+    isShown = true;
     buildPad();
     renderDots();
     const sub = $("#lock-sub");
     if (sub) sub.textContent = "PIN'ini gir";
+    const bioBtn = $("#lock-bio");
+    if (bioBtn) bioBtn.hidden = !Store.state.settings.lock?.bioId;
     screen.hidden = false;
     document.body.classList.add("locked");
     hydrateIcons(screen);
+    // Offer biometric immediately if registered
+    if (Store.state.settings.lock?.bioId) unlockBiometric();
   }
 
   function maybeLock() {
     if (isEnabled()) show();
+  }
+
+  /* ---- biometric (WebAuthn platform authenticator) ---- */
+  async function bioSupported() {
+    try {
+      return (
+        typeof PublicKeyCredential !== "undefined" &&
+        (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async function registerBiometric() {
+    if (!(await bioSupported())) {
+      Toast.show("Bu cihazda biyometrik yok", "error");
+      return false;
+    }
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      const userId = crypto.getRandomValues(new Uint8Array(16));
+      const cred = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: { name: "Bütçe" },
+          user: { id: userId, name: "butce", displayName: "Bütçe" },
+          pubKeyCredParams: [
+            { type: "public-key", alg: -7 },
+            { type: "public-key", alg: -257 },
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: "platform",
+            userVerification: "required",
+          },
+          timeout: 60000,
+        },
+      });
+      if (!cred) return false;
+      Store.update((s) => {
+        s.settings.lock = s.settings.lock || {};
+        s.settings.lock.bioId = bufToB64(cred.rawId);
+      });
+      Toast.show("Biyometrik kilit açık", "success");
+      return true;
+    } catch {
+      Toast.show("Biyometrik eklenemedi", "error");
+      return false;
+    }
+  }
+
+  async function unlockBiometric() {
+    const lock = Store.state.settings.lock;
+    if (!lock?.bioId) return;
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      const ok = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          allowCredentials: [{ type: "public-key", id: b64ToBuf(lock.bioId) }],
+          userVerification: "required",
+          timeout: 60000,
+        },
+      });
+      if (ok && isShown) unlockSuccess();
+    } catch {
+      // user cancelled or failed → stay on PIN screen (silent)
+    }
+  }
+
+  /* ---- auto-lock on background ---- */
+  function bindAutoLock() {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+      } else if (document.visibilityState === "visible") {
+        if (
+          isEnabled() &&
+          !isShown &&
+          hiddenAt &&
+          Date.now() - hiddenAt >= LOCK_BG_GRACE_MS
+        ) {
+          show();
+        }
+        hiddenAt = 0;
+      }
+    });
   }
 
   function syncToggle() {
@@ -5429,17 +5608,60 @@ const AppLock = (() => {
     }
   }
 
+  async function syncBioToggle() {
+    const row = $("#bio-toggle");
+    if (!row) return;
+    const supported = await bioSupported();
+    const usable = supported && isEnabled();
+    row.hidden = !supported;
+    row.classList.toggle("disabled", !usable);
+    const on = !!Store.state.settings.lock?.bioId;
+    row.setAttribute("aria-pressed", String(on));
+    const sub = $("#bio-toggle-sub");
+    if (sub) {
+      sub.textContent = !isEnabled()
+        ? "Önce PIN kilidini aç"
+        : on
+          ? "Açık — Face ID / parmak izi"
+          : "Face ID / parmak izi ile aç";
+    }
+  }
+
   function bind() {
     const toggle = $("#lock-toggle");
-    if (!toggle) return;
-    syncToggle();
-    toggle.addEventListener("click", async () => {
-      if (isEnabled()) {
-        if (await disable()) syncToggle();
-      } else {
-        if (await setup()) syncToggle();
-      }
-    });
+    if (toggle) {
+      syncToggle();
+      toggle.addEventListener("click", async () => {
+        if (isEnabled()) {
+          if (await disable()) syncToggle();
+        } else {
+          if (await setup()) syncToggle();
+        }
+        syncBioToggle();
+      });
+    }
+    const bioRow = $("#bio-toggle");
+    if (bioRow) {
+      syncBioToggle();
+      bioRow.addEventListener("click", async () => {
+        if (!isEnabled()) {
+          Toast.show("Önce PIN kilidini aç", "info");
+          return;
+        }
+        if (Store.state.settings.lock?.bioId) {
+          Store.update((s) => {
+            delete s.settings.lock.bioId;
+          });
+          Toast.show("Biyometrik kapatıldı", "info");
+        } else {
+          await registerBiometric();
+        }
+        syncBioToggle();
+      });
+    }
+    const bioBtn = $("#lock-bio");
+    if (bioBtn) bioBtn.addEventListener("click", unlockBiometric);
+    bindAutoLock();
   }
 
   return { isEnabled, verify, hash, setup, disable, maybeLock, bind };
@@ -6339,6 +6561,52 @@ function bindOnboarding() {
   }
 }
 
+/* ==========================================================================
+   ACCENT — user-selectable accent color (settings.accent → --accent)
+   ========================================================================== */
+
+const ACCENT_PRESETS = [
+  "#0a84ff",
+  "#00b574",
+  "#7c5cff",
+  "#ff375f",
+  "#ff9500",
+  "#30b0c7",
+  "#e5364e",
+  "#5b6472",
+];
+
+function applyAccent() {
+  const c = Store.state.settings.accent;
+  if (c) document.documentElement.style.setProperty("--accent", c);
+  else document.documentElement.style.removeProperty("--accent");
+}
+
+function bindAccent() {
+  const wrap = $("#accent-swatches");
+  if (!wrap) return;
+  clear(wrap);
+  const cur = Store.state.settings.accent || ACCENT_PRESETS[0];
+  for (const c of ACCENT_PRESETS) {
+    wrap.appendChild(
+      el("button", {
+        type: "button",
+        class: `accent-swatch${c === cur ? " active" : ""}`,
+        style: `background:${c}`,
+        "aria-label": `Aksan rengi ${c}`,
+        onclick: () => {
+          Store.update((s) => {
+            s.settings.accent = c;
+          });
+          applyAccent();
+          bindAccent();
+          Haptics.light();
+        },
+      }),
+    );
+  }
+}
+
 /** Open the right sheet when launched via a PWA shortcut (?action=...). */
 function handleLaunchAction() {
   try {
@@ -6369,6 +6637,7 @@ function remindDue() {
 
 function init() {
   Theme.init();
+  applyAccent();
   Lang.init();
   Privacy.init();
   hydrateIcons();
@@ -6411,6 +6680,7 @@ function init() {
   Goals.bind();
   Debts.bind();
   AppLock.bind();
+  bindAccent();
   bindOnboarding();
   SearchPalette.bind();
 

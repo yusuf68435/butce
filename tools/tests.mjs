@@ -156,7 +156,7 @@ const APP_PLUS_EXPORTS =
   computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
   normalizeTags, goalProgress, debtsNet, collectDueReminders, tagSpending,
   AppLock, monthDailyExpense, categoryMonthlyTrend,
-  applyTxFilters, buildSampleData,
+  applyTxFilters, buildSampleData, cumulativeBalanceTrend,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -625,6 +625,20 @@ test("buildSampleData: valid populated state with onboarded flag", () => {
   for (const tx of s.transactions) {
     assert.ok(tx.id && tx.type && tx.category && tx.amount > 0 && tx.date);
   }
+});
+
+test("cumulativeBalanceTrend: running net balance at each month-end", () => {
+  const tx = [
+    { type: "income", amount: 1000, date: "2026-04-15" },
+    { type: "expense", amount: 300, date: "2026-05-10" },
+    { type: "income", amount: 500, date: "2026-06-02" },
+  ];
+  const series = sandbox.cumulativeBalanceTrend("2026-06", tx, 3);
+  assert.equal(series.length, 3);
+  assert.equal(series[0].key, "2026-04");
+  assert.equal(series[0].v, 1000); // end of April: +1000
+  assert.equal(series[1].v, 700); // end of May: 1000 − 300
+  assert.equal(series[2].v, 1200); // end of June: +500
 });
 
 // Run
