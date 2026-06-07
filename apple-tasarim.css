@@ -270,8 +270,8 @@ html[data-theme="dark"] .viewport {
   transform: translateY(0);
 }
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: var(--r-pill);
@@ -723,8 +723,10 @@ html[data-privacy="true"] .donut-center .value::after {
 .month-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 14px 8px 16px;
+  min-height: 44px;
+  padding: 8px 16px;
   background: var(--bg-2);
   border: 1px solid var(--hairline);
   border-radius: var(--r-pill);
@@ -1262,7 +1264,8 @@ html[data-theme="dark"] .tab.active {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 13px;
+  min-height: 44px;
+  padding: 9px 14px;
   border-radius: var(--r-pill);
   background: var(--bg-2);
   border: 1px solid var(--hairline);
@@ -1366,6 +1369,7 @@ html[data-theme="dark"] .tab.active {
 }
 .mini-btn {
   flex: 1;
+  min-height: 44px;
   padding: 8px 10px;
   border-radius: var(--r-input);
   background: var(--hairline);
@@ -1617,8 +1621,8 @@ body.locked {
   gap: 10px;
 }
 .accent-swatch {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -2166,9 +2170,13 @@ body.locked {
 }
 .wealth-legend .leg .v {
   font-weight: 700;
-  font-size: 14px;
-  letter-spacing: -0.015em;
+  font-size: 13px;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wealth-legend .leg {
+  min-width: 0;
 }
 .wealth-legend .leg .v.is-negative {
   color: var(--neg);
@@ -2523,7 +2531,10 @@ html[data-theme="dark"] .price-card .pull-btn {
   font-size: 16px;
   font-weight: 500;
   color: var(--accent-fg);
+  min-height: 44px;
   padding: 6px 4px;
+  display: inline-flex;
+  align-items: center;
   letter-spacing: -0.01em;
 }
 html[data-theme="dark"] .sheet-action {
@@ -3274,13 +3285,17 @@ html[data-theme="dark"] .month-cell.active {
   background: var(--pos);
   box-shadow: 0 0 6px rgba(0, 181, 116, 0.6);
   pointer-events: none;
+  /* Surface status only when there's a problem (offline) — no persistent dot */
+  opacity: 0;
   transition:
     background 0.24s,
-    box-shadow 0.24s;
+    box-shadow 0.24s,
+    opacity 0.24s;
 }
 .online-dot.offline {
   background: var(--warn);
   box-shadow: 0 0 6px rgba(255, 176, 32, 0.6);
+  opacity: 1;
 }
 
 /* ============ CONFIRM / PROMPT ============ */
