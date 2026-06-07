@@ -33,7 +33,7 @@ python -m http.server 8080
 npx serve .
 ```
 
-Sonra: <http://localhost:8080>
+Sonra: <http://localhost:8080/uygulama/> (uygulama `uygulama/` altında; `apple-tasarim.css` kökten yüklenir)
 
 > Service Worker `localhost` veya HTTPS gerektirir.
 
@@ -82,16 +82,17 @@ git push -u origin main
 
 ```
 .
-├── index.html          # Tek sayfa, 3 sekme + 11 sheet (~1100 satır)
-├── style.css           # Token sistem, ~2700 satır
-├── app.js              # Modüler vanilla JS IIFE, ~4500 satır
-│                       #   Store · FX · Photos (IDB) · Currency · Theme · Lang
-│                       #   Privacy · Sheets · Toast · Confirm · Prompt · DatePicker
-│                       #   TxSheet · PendingSheet · CollectSheet · SilverSheet
-│                       #   MonthPicker · Settings · Budgets · Recurring · SearchPalette
-├── manifest.json       # PWA manifest (categories, shortcuts, maskable)
-├── service-worker.js   # Cache-first + update prompt (ggai-v32)
-└── tools/
+├── apple-tasarim.css   # Apple-tarzı tasarım dosyası — token sistem, ~2700 satır (kökte)
+├── uygulama/           # Çalışan uygulama (apple-tasarim.css'i ../ ile çeker)
+│   ├── index.html      # Tek sayfa, 3 sekme + 11 sheet (~1100 satır)
+│   ├── app.js          # Modüler vanilla JS IIFE, ~4500 satır
+│   │                   #   Store · FX · Photos (IDB) · Currency · Theme · Lang
+│   │                   #   Privacy · Sheets · Toast · Confirm · Prompt · DatePicker
+│   │                   #   TxSheet · PendingSheet · CollectSheet · SilverSheet
+│   │                   #   MonthPicker · Settings · Budgets · Recurring · SearchPalette
+│   ├── manifest.json   # PWA manifest (categories, shortcuts, maskable)
+│   └── service-worker.js   # Cache-first + update prompt (ggai-v35)
+└── tools/                  # build düz dist/ üretir (Vercel buradan deploy eder)
     ├── build.mjs       # terser + csso → dist/
     ├── capture.mjs     # Playwright 20-screenshot pipeline
     └── tests.mjs       # 19 unit tests, vm sandbox

@@ -20,7 +20,7 @@ python -m http.server 8080
 # Node (npx)
 npx serve .
 
-# Sonra: http://localhost:8080
+# Sonra: http://localhost:8080/uygulama/
 ```
 
 Service worker test etmek için `localhost` üzerinden veya HTTPS gereklidir.
@@ -35,12 +35,12 @@ Service worker test etmek için `localhost` üzerinden veya HTTPS gereklidir.
 
 ```
 .
-├── index.html          # Tek sayfa, 3 sekme (Nakit / Bekleyen / Gümüş)
-├── style.css           # Mobil öncelikli, otomatik dark/light, max-width 480px
-├── app.js              # Tüm uygulama mantığı (state, render, storage)
-├── manifest.json       # PWA manifest
-├── service-worker.js   # Offline cache
-└── icons/              # PWA ikonları (varsa)
+├── apple-tasarim.css   # Apple-tarzı tasarım (mobil öncelikli, dark/light, max-width 480px) — KÖKTE
+└── uygulama/           # Çalışan uygulama (apple-tasarim.css'i ../ ile çeker)
+    ├── index.html      # Tek sayfa, 3 sekme (Nakit / Bekleyen / Gümüş)
+    ├── app.js          # Tüm uygulama mantığı (state, render, storage)
+    ├── manifest.json   # PWA manifest
+    └── service-worker.js   # Offline cache
 ```
 
 ## Veri Modeli (localStorage)

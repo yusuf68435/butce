@@ -1,6 +1,6 @@
 // Production build — minified dist/
 // Usage: npm run build
-// Outputs: dist/index.html, dist/style.css, dist/app.js, manifest.json, service-worker.js
+// Outputs: dist/index.html, dist/apple-tasarim.css, dist/app.js, manifest.json, service-worker.js
 
 import {
   mkdir,
@@ -40,13 +40,13 @@ async function build() {
   }
   await mkdir(DIST, { recursive: true });
 
-  // CSS
-  const cssIn = await readFile(resolve(ROOT, "style.css"), "utf8");
+  // CSS (Apple design file lives at repo root)
+  const cssIn = await readFile(resolve(ROOT, "apple-tasarim.css"), "utf8");
   const cssOut = minifyCSS(cssIn, { restructure: true, comments: false }).css;
-  await writeFile(resolve(DIST, "style.css"), cssOut, "utf8");
+  await writeFile(resolve(DIST, "apple-tasarim.css"), cssOut, "utf8");
 
-  // JS
-  const jsIn = await readFile(resolve(ROOT, "app.js"), "utf8");
+  // JS (app source lives under uygulama/)
+  const jsIn = await readFile(resolve(ROOT, "uygulama", "app.js"), "utf8");
   const jsRes = await minifyJS(jsIn, {
     ecma: 2020,
     compress: {
@@ -60,20 +60,29 @@ async function build() {
   if (jsRes.error) throw jsRes.error;
   await writeFile(resolve(DIST, "app.js"), jsRes.code, "utf8");
 
-  // HTML — strip ?v=N query (immutable hashes can be added by CDN if desired)
-  let html = await readFile(resolve(ROOT, "index.html"), "utf8");
+  // HTML — flatten ../ paths (dist is flat) + strip ?v=N query
+  let html = await readFile(resolve(ROOT, "uygulama", "index.html"), "utf8");
   html = html
-    .replace(/style\.css\?v=\d+/g, "style.css")
+    .replace(/\.\.\/apple-tasarim\.css\?v=\d+/g, "apple-tasarim.css")
     .replace(/app\.js\?v=\d+/g, "app.js")
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/\s+\n/g, "\n")
     .replace(/\n\s*\n/g, "\n");
   await writeFile(resolve(DIST, "index.html"), html, "utf8");
 
-  // Static copies
-  for (const name of ["manifest.json", "service-worker.js"]) {
-    await copyFile(resolve(ROOT, name), resolve(DIST, name));
-  }
+  // manifest — plain copy (paths are relative to its own folder)
+  await copyFile(
+    resolve(ROOT, "uygulama", "manifest.json"),
+    resolve(DIST, "manifest.json"),
+  );
+
+  // service worker — flatten the parent-path CSS reference (dist is flat)
+  const swIn = await readFile(
+    resolve(ROOT, "uygulama", "service-worker.js"),
+    "utf8",
+  );
+  const swOut = swIn.replace(/\.\.\/apple-tasarim\.css/g, "./apple-tasarim.css");
+  await writeFile(resolve(DIST, "service-worker.js"), swOut, "utf8");
 
   // Stats
   const cssGzip = Buffer.byteLength(cssOut);
@@ -82,7 +91,7 @@ async function build() {
   const jsSrc = Buffer.byteLength(jsIn);
   console.log("\n  build complete\n");
   console.log(
-    `  style.css   ${(cssSrc / 1024).toFixed(1)} KB  →  ${(cssGzip / 1024).toFixed(1)} KB  (-${Math.round((1 - cssGzip / cssSrc) * 100)}%)`,
+    `  apple-tasarim.css   ${(cssSrc / 1024).toFixed(1)} KB  →  ${(cssGzip / 1024).toFixed(1)} KB  (-${Math.round((1 - cssGzip / cssSrc) * 100)}%)`,
   );
   console.log(
     `  app.js      ${(jsSrc / 1024).toFixed(1)} KB  →  ${(jsGzip / 1024).toFixed(1)} KB  (-${Math.round((1 - jsGzip / jsSrc) * 100)}%)`,

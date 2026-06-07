@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
-const APP = await readFile(resolve(ROOT, "app.js"), "utf8");
+const APP = await readFile(resolve(ROOT, "uygulama", "app.js"), "utf8");
 
 // Minimal browser shims to allow app.js top-level to evaluate.
 const sandbox = {

@@ -1,10 +1,10 @@
 "use strict";
 
-const CACHE_NAME = "ggai-v34";
+const CACHE_NAME = "ggai-v35";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css",
+  "../apple-tasarim.css",
   "./app.js",
   "./manifest.json",
 ];

@@ -14,6 +14,9 @@ const ROOT = resolve(__dirname, "..");
 const OUT = resolve(ROOT, "screenshots");
 const PORT = 8766;
 const URL = `http://localhost:${PORT}`;
+// App source lives under uygulama/ (apple-tasarim.css stays at repo root, so we
+// serve from ROOT and navigate into the subfolder).
+const BASE = `${URL}/uygulama`;
 
 const SEED = `(() => {
   const today = new Date();
@@ -70,7 +73,7 @@ async function startServer() {
   );
   for (let i = 0; i < 30; i++) {
     try {
-      const r = await fetch(URL + "/index.html");
+      const r = await fetch(BASE + "/index.html");
       if (r.ok) return proc;
     } catch {}
     await sleep(200);
@@ -102,9 +105,9 @@ async function newPage(browser, theme) {
 async function gotoFresh(page, seed) {
   // Use `load` (not `networkidle`) — the PWA's deferred script + font load can
   // keep the network busy long enough to time out networkidle on slow CI.
-  await page.goto(URL + "/?b=" + Date.now(), { waitUntil: "load" });
+  await page.goto(BASE + "/?b=" + Date.now(), { waitUntil: "load" });
   await page.evaluate(seed);
-  await page.goto(URL + "/?b=" + Date.now(), { waitUntil: "load" });
+  await page.goto(BASE + "/?b=" + Date.now(), { waitUntil: "load" });
   await page.waitForSelector(".tab.active");
   await sleep(700); // let sparkline + bars animate
 }
@@ -253,7 +256,7 @@ async function run() {
 
       // ── Empty states ──
       await page.evaluate(EMPTY_STATE);
-      await page.goto(URL + "/?empty=" + Date.now(), {
+      await page.goto(BASE + "/?empty=" + Date.now(), {
         waitUntil: "load",
       });
       await page.waitForSelector(".tab.active");
