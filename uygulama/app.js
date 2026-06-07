@@ -8,6 +8,8 @@ const STORAGE_KEY = "ggai:state:v1";
 const STATE_VERSION = 1;
 const OUNCE_TO_GRAM = 31.1035;
 const AGED_DAYS = 60;
+const BACKUP_REMINDER_DAYS = 7;
+const PBKDF2_ITERS = 150000;
 
 const TR_MONTHS = [
   "Ocak",
@@ -573,6 +575,9 @@ const Store = (() => {
         },
         recurring: p.recurring || [],
         budgets: p.budgets || {},
+        goals: p.goals || [],
+        debts: p.debts || [],
+        templates: p.templates || [],
         settings: p.settings || {},
       };
     } catch {
@@ -590,6 +595,9 @@ const Store = (() => {
       },
       recurring: [],
       budgets: {},
+      goals: [],
+      debts: [],
+      templates: [],
       settings: {},
     };
   }
@@ -4156,6 +4164,86 @@ const MonthPicker = (() => {
 })();
 
 /* ==========================================================================
+   BACKUP CRYPTO — AES-256-GCM + PBKDF2 (Web Crypto, no deps)
+   ========================================================================== */
+
+const BackupCrypto = (() => {
+  // Encoders are created lazily inside functions so module load never touches
+  // browser-only globals (keeps the vm test sandbox happy).
+
+  /** Base64-encode an ArrayBuffer in chunks (avoids call-stack overflow on big backups). */
+  function bufToB64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(bin);
+  }
+  function b64ToBuf(str) {
+    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+  }
+
+  /** @returns {Promise<CryptoKey>} */
+  function deriveKey(password, salt) {
+    return crypto.subtle
+      .importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, [
+        "deriveKey",
+      ])
+      .then((base) =>
+        crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt, iterations: PBKDF2_ITERS, hash: "SHA-256" },
+          base,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"],
+        ),
+      );
+  }
+
+  async function encrypt(plaintext, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const ct = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      new TextEncoder().encode(plaintext),
+    );
+    return {
+      app: "ggai",
+      enc: "AES-GCM",
+      kdf: "PBKDF2",
+      iter: PBKDF2_ITERS,
+      salt: bufToB64(salt),
+      iv: bufToB64(iv),
+      data: bufToB64(ct),
+    };
+  }
+
+  async function decrypt(box, password) {
+    const key = await deriveKey(password, b64ToBuf(box.salt));
+    const pt = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: b64ToBuf(box.iv) },
+      key,
+      b64ToBuf(box.data),
+    );
+    return new TextDecoder().decode(pt);
+  }
+
+  function isEncrypted(obj) {
+    return !!obj && obj.enc === "AES-GCM" && typeof obj.data === "string";
+  }
+
+  function supported() {
+    return typeof crypto !== "undefined" && !!crypto.subtle;
+  }
+
+  return { encrypt, decrypt, isEncrypted, supported };
+})();
+
+/* ==========================================================================
    SETTINGS
    ========================================================================== */
 
@@ -4180,65 +4268,170 @@ const Settings = (() => {
     Currency.init();
     Sheets.open("sheet-settings");
   }
-  function exportData() {
-    const payload = {
+  /** Trigger a client-side file download from a string. */
+  function download(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Record that a backup just happened (drives the reminder + Settings subtitle). */
+  function stampBackup() {
+    const today = todayISO();
+    Store.update((s) => {
+      s.settings.lastBackup = today;
+    });
+    const sub = $("#export-sub");
+    if (sub) sub.textContent = `Son yedek: ${fmt.date(today)}`;
+  }
+
+  function backupPayload() {
+    return {
       app: "ggai",
       version: STATE_VERSION,
       exportedAt: new Date().toISOString(),
       state: Store.state,
     };
-    const json = JSON.stringify(payload, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const today = todayISO();
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `butce-yedek-${today}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    Store.update((s) => {
-      s.settings.lastBackup = today;
-    });
-    $("#export-sub").textContent = `Son yedek: ${fmt.date(today)}`;
   }
+
+  function exportData() {
+    download(
+      JSON.stringify(backupPayload(), null, 2),
+      `butce-yedek-${todayISO()}.json`,
+      "application/json",
+    );
+    stampBackup();
+  }
+
+  async function exportEncrypted() {
+    if (!BackupCrypto.supported()) {
+      Toast.show("Bu tarayıcıda şifreleme desteği yok", "error");
+      return;
+    }
+    const pw = await Prompt.show({
+      title: "Şifreli Yedek",
+      label: "Parola belirle",
+      placeholder: "En az 4 karakter",
+    });
+    if (!pw) return;
+    if (pw.length < 4) {
+      Toast.show("Parola en az 4 karakter olmalı", "error");
+      return;
+    }
+    try {
+      const box = await BackupCrypto.encrypt(
+        JSON.stringify(backupPayload()),
+        pw,
+      );
+      download(
+        JSON.stringify(box),
+        `butce-sifreli-${todayISO()}.json`,
+        "application/json",
+      );
+      stampBackup();
+      Toast.show("Şifreli yedek indirildi", "success");
+    } catch (err) {
+      Toast.show("Şifreleme başarısız", "error");
+      console.error("[Settings] encrypt failed:", err);
+    }
+  }
+
+  /** Export all transactions as CSV (date,type,category,amount,description). */
+  function exportCSV() {
+    const escape = (v) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [["date", "type", "category", "amount", "description"]];
+    const sorted = [...Store.state.transactions].sort((a, b) =>
+      (a.date || "").localeCompare(b.date || ""),
+    );
+    for (const tx of sorted) {
+      rows.push([
+        tx.date,
+        tx.type,
+        tx.category,
+        tx.amount,
+        tx.description || "",
+      ]);
+    }
+    const csv = rows.map((r) => r.map(escape).join(",")).join("\n");
+    download(csv, `butce-${todayISO()}.csv`, "text/csv;charset=utf-8");
+    Toast.show(
+      `${Store.state.transactions.length} hareket dışa aktarıldı`,
+      "success",
+    );
+  }
+  /** Overwrite the whole store from an imported state, preserving every key
+      (recurring/budgets/goals/debts/templates were silently dropped before). */
+  async function applyImportedState(incoming) {
+    if (!incoming || typeof incoming !== "object") throw new Error("bad state");
+    if (!Array.isArray(incoming.transactions))
+      throw new Error("no transactions");
+
+    const ok = await Confirm.show({
+      title: "Yedeği yüklemek istiyor musun?",
+      message: "Mevcut tüm verinin üzerine yazılacak.",
+      confirmLabel: "Yükle",
+      danger: true,
+    });
+    if (!ok) return false;
+
+    // Backup file does not embed photos — clear stale blobs to avoid orphans
+    await Photos.clear();
+    Store.replace({
+      transactions: incoming.transactions || [],
+      pending: incoming.pending || [],
+      silver: incoming.silver || [],
+      categories: {
+        income: incoming.categories?.income || [...DEFAULT_CATEGORIES.income],
+        expense: incoming.categories?.expense || [
+          ...DEFAULT_CATEGORIES.expense,
+        ],
+      },
+      recurring: incoming.recurring || [],
+      budgets: incoming.budgets || {},
+      goals: incoming.goals || [],
+      debts: incoming.debts || [],
+      templates: incoming.templates || [],
+      settings: incoming.settings || {},
+    });
+    Sheets.close("sheet-settings");
+    Toast.show("Yedek yüklendi", "success");
+    return true;
+  }
+
   function importData(file) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = JSON.parse(String(e.target.result));
+        let data = JSON.parse(String(e.target.result));
+
+        // Encrypted backup → ask for the password and decrypt first.
+        if (BackupCrypto.isEncrypted(data)) {
+          const pw = await Prompt.show({
+            title: "Şifreli Yedek",
+            label: "Parolayı gir",
+            placeholder: "Yedek parolası",
+          });
+          if (!pw) return;
+          try {
+            data = JSON.parse(await BackupCrypto.decrypt(data, pw));
+          } catch {
+            Toast.show("Parola yanlış veya dosya bozuk", "error");
+            return;
+          }
+        }
+
         const incoming = data?.state || data;
-        if (!incoming || typeof incoming !== "object") throw new Error();
-        if (!Array.isArray(incoming.transactions)) throw new Error();
-
-        const ok = await Confirm.show({
-          title: "Yedeği yüklemek istiyor musun?",
-          message: "Mevcut tüm verinin üzerine yazılacak.",
-          confirmLabel: "Yükle",
-          danger: true,
-        });
-        if (!ok) return;
-
-        // Backup file does not embed photos — clear stale blobs to avoid orphans
-        await Photos.clear();
-        Store.replace({
-          transactions: incoming.transactions || [],
-          pending: incoming.pending || [],
-          silver: incoming.silver || [],
-          categories: {
-            income: incoming.categories?.income || [
-              ...DEFAULT_CATEGORIES.income,
-            ],
-            expense: incoming.categories?.expense || [
-              ...DEFAULT_CATEGORIES.expense,
-            ],
-          },
-          settings: incoming.settings || {},
-        });
-        Sheets.close("sheet-settings");
-        Toast.show("Yedek yüklendi", "success");
+        await applyImportedState(incoming);
       } catch {
         Toast.show("Geçersiz yedek dosyası", "error");
       } finally {
@@ -4422,6 +4615,10 @@ const Settings = (() => {
         }
       });
     }
+    const csvOutBtn = $("#export-csv-btn");
+    if (csvOutBtn) csvOutBtn.addEventListener("click", exportCSV);
+    const encBtn = $("#export-enc-btn");
+    if (encBtn) encBtn.addEventListener("click", exportEncrypted);
     $("#reset-btn").addEventListener("click", reset);
     $$("[data-theme-opt]").forEach((b) => {
       b.addEventListener("click", () => Theme.apply(b.dataset.themeOpt));
@@ -4449,7 +4646,24 @@ const Settings = (() => {
     const fxBtn = $("#fx-fetch-btn");
     if (fxBtn) fxBtn.addEventListener("click", () => Currency.fetchRates());
   }
-  return { open, bind };
+
+  /** Gentle nudge to back up if there's data and the last backup is stale. */
+  function maybeRemindBackup() {
+    const s = Store.state;
+    if (!s.transactions.length) return;
+    const last = s.settings.lastBackup;
+    const stale = !last || daysSince(last) >= BACKUP_REMINDER_DAYS;
+    if (!stale) return;
+    Toast.show(
+      last
+        ? `Son yedekten bu yana ${daysSince(last)} gün geçti — yedek almayı unutma`
+        : "Henüz yedek almadın — verini korumak için Ayarlar'dan yedekle",
+      "info",
+      { duration: 5000 },
+    );
+  }
+
+  return { open, bind, maybeRemindBackup };
 })();
 
 /* ==========================================================================
@@ -4800,6 +5014,8 @@ function init() {
     if (applied > 0) {
       Toast.show(`${applied} ${t("toast.recurringApplied")}`, "success");
     }
+    // Backup reminder — delayed so it doesn't collide with the recurring toast
+    setTimeout(() => Settings.maybeRemindBackup(), applied > 0 ? 3500 : 1200);
   });
 
   // Wrap native date inputs with custom pill

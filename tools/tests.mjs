@@ -127,6 +127,13 @@ const sandbox = {
   },
   Blob: class {},
   URL: { createObjectURL: () => "blob:", revokeObjectURL: () => {} },
+  // Web Crypto shims (Node globals) for BackupCrypto round-trip tests
+  TextEncoder,
+  TextDecoder,
+  crypto: globalThis.crypto,
+  btoa: (s) => Buffer.from(s, "binary").toString("base64"),
+  atob: (s) => Buffer.from(s, "base64").toString("binary"),
+  Uint8Array,
 };
 sandbox.window = Object.assign(sandbox.window, sandbox);
 sandbox.global = sandbox;
@@ -145,7 +152,7 @@ const APP_PLUS_EXPORTS =
   Confirm, Prompt, DatePicker, Budgets, ETA_OPTIONS, ETA_LABELS,
   CATEGORY_META, CHART_PALETTE, OUNCE_TO_GRAM,
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
-  SearchPalette, dailyExpenseHeatmap,
+  SearchPalette, dailyExpenseHeatmap, BackupCrypto,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -384,6 +391,28 @@ test("dailyExpenseHeatmap: aggregates expenses, ignores income, computes max", (
   assert.equal(h.total, 350);
   assert.equal(h.days, 1);
   assert.equal(h.max, 350);
+});
+
+test("BackupCrypto: encrypt → decrypt round-trip recovers JSON", async () => {
+  const original = JSON.stringify({ transactions: [{ id: "a", amount: 42 }] });
+  const box = await sandbox.BackupCrypto.encrypt(original, "gizli-parola");
+  assert.equal(sandbox.BackupCrypto.isEncrypted(box), true);
+  assert.equal(box.enc, "AES-GCM");
+  assert.notEqual(box.data, original); // ciphertext must differ from plaintext
+  const back = await sandbox.BackupCrypto.decrypt(box, "gizli-parola");
+  assert.equal(back, original);
+});
+
+test("BackupCrypto: wrong password fails to decrypt", async () => {
+  const box = await sandbox.BackupCrypto.encrypt("secret", "dogru");
+  await assert.rejects(() => sandbox.BackupCrypto.decrypt(box, "yanlis"));
+});
+
+test("BackupCrypto: each encryption uses a fresh salt + iv", async () => {
+  const a = await sandbox.BackupCrypto.encrypt("x", "p");
+  const b = await sandbox.BackupCrypto.encrypt("x", "p");
+  assert.notEqual(a.salt, b.salt);
+  assert.notEqual(a.iv, b.iv);
 });
 
 // Run
