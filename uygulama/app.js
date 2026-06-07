@@ -2306,6 +2306,7 @@ function renderCash() {
   drawSparkline($("#cash-spark"), monthlyTrend(6, "balance"));
 
   renderWealth();
+  renderInsights();
   renderTrend();
   renderHeatmap();
   renderExpenseChart(t.list);
@@ -2352,6 +2353,197 @@ function renderTrend() {
       col.style.height = h + "px";
     });
   });
+}
+
+/* ==========================================================================
+   INSIGHTS — month summary, forecast, anomaly (pure compute + render)
+   ========================================================================== */
+
+const INSIGHT_ANOMALY_FACTOR = 1.5; // current vs avg ratio to flag
+const INSIGHT_ANOMALY_MIN = 200; // ignore tiny absolute jumps (TRY)
+const INSIGHT_FORECAST_MIN_DAY = 3; // too early in the month → no forecast
+
+/** monthKey shifted `back` months earlier (e.g. "2026-03" → "2026-02"). */
+function shiftMonthKey(key, back) {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, m - 1 - back, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function expenseByCategory(list) {
+  const by = Object.create(null);
+  for (const tx of list) {
+    if (tx.type === "expense")
+      by[tx.category] = (by[tx.category] || 0) + tx.amount;
+  }
+  return by;
+}
+
+/** Project end-of-month expense/balance from the burn rate so far.
+    Only meaningful for the current real month; null otherwise. */
+function forecastMonthEnd(monthKey, cur) {
+  if (monthKey !== currentMonthKey()) return null;
+  const now = new Date();
+  const day = now.getDate();
+  if (day < INSIGHT_FORECAST_MIN_DAY) return null;
+  const daysInMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+  ).getDate();
+  const projectedExpense = (cur.expense / day) * daysInMonth;
+  return {
+    projectedExpense,
+    projectedBalance: cur.income - projectedExpense,
+    daysLeft: daysInMonth - day,
+  };
+}
+
+/** Biggest category whose spend this month far exceeds its recent average. */
+function detectAnomaly(monthKey, byCat, lookback = 3) {
+  let worst = null;
+  for (const [cat, amount] of Object.entries(byCat)) {
+    let sum = 0;
+    for (let i = 1; i <= lookback; i++) {
+      const list = txOfMonth(shiftMonthKey(monthKey, i));
+      sum += list
+        .filter((t) => t.type === "expense" && t.category === cat)
+        .reduce((s, t) => s + t.amount, 0);
+    }
+    const avg = sum / lookback;
+    if (
+      avg > 0 &&
+      amount > avg * INSIGHT_ANOMALY_FACTOR &&
+      amount - avg >= INSIGHT_ANOMALY_MIN
+    ) {
+      if (!worst || amount - avg > worst.delta) {
+        worst = { category: cat, amount, avg, delta: amount - avg };
+      }
+    }
+  }
+  return worst;
+}
+
+/** Aggregate every insight fact for a month. Pure-ish: reads Store via totals. */
+function computeInsights(monthKey) {
+  const cur = totalsOf(monthKey);
+  const prev = totalsOf(shiftMonthKey(monthKey, 1));
+  const expenseDelta = cur.expense - prev.expense;
+  const expensePct =
+    prev.expense > 0 ? (expenseDelta / prev.expense) * 100 : null;
+
+  const byCat = expenseByCategory(cur.list);
+  let topCat = null;
+  let topAmt = 0;
+  for (const [c, a] of Object.entries(byCat)) {
+    if (a > topAmt) {
+      topAmt = a;
+      topCat = c;
+    }
+  }
+  const topShare = cur.expense > 0 ? (topAmt / cur.expense) * 100 : 0;
+
+  return {
+    cur,
+    prev,
+    expenseDelta,
+    expensePct,
+    topCat,
+    topAmt,
+    topShare,
+    hasData: cur.list.length > 0 || prev.list.length > 0,
+    forecast: forecastMonthEnd(monthKey, cur),
+    anomaly: detectAnomaly(monthKey, byCat),
+  };
+}
+
+function insightRow(icon, kind, title, value, valueKind) {
+  const row = el("div", { class: "insight-row" });
+  row.appendChild(
+    el("span", { class: `insight-ic ${kind}`, "data-icon": icon }),
+  );
+  const text = el("div", { class: "insight-text" });
+  text.appendChild(el("div", { class: "insight-title" }, title));
+  text.appendChild(el("div", { class: "insight-value" }, value));
+  row.appendChild(text);
+  if (valueKind) row.classList.add(valueKind);
+  return row;
+}
+
+function renderInsights() {
+  const section = $("#insights-section");
+  const card = $("#insights-card");
+  if (!section || !card) return;
+  const ins = computeInsights(viewMonth);
+  if (!ins.hasData) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  clear(card);
+
+  // Month balance headline
+  card.appendChild(
+    insightRow(
+      ins.cur.balance >= 0 ? "trend" : "trend",
+      ins.cur.balance >= 0 ? "pos" : "neg",
+      "Bu ay net bakiye",
+      fmt.signed(ins.cur.balance),
+    ),
+  );
+
+  // Expense vs last month
+  if (ins.expensePct != null) {
+    const up = ins.expenseDelta > 0;
+    card.appendChild(
+      insightRow(
+        up ? "arrow-up" : "arrow-down",
+        up ? "neg" : "pos",
+        "Geçen aya göre gider",
+        `${up ? "+" : ""}${ins.expensePct.toFixed(0)}% (${fmt.signed(ins.expenseDelta)})`,
+      ),
+    );
+  }
+
+  // Biggest category
+  if (ins.topCat) {
+    card.appendChild(
+      insightRow(
+        "cart",
+        "neutral",
+        `En çok: ${ins.topCat}`,
+        `${fmt.try(ins.topAmt)} · %${ins.topShare.toFixed(0)}`,
+      ),
+    );
+  }
+
+  // End-of-month forecast
+  if (ins.forecast) {
+    const f = ins.forecast;
+    card.appendChild(
+      insightRow(
+        "sparkles",
+        f.projectedBalance >= 0 ? "pos" : "neg",
+        `Ay sonu tahmini (${f.daysLeft} gün kaldı)`,
+        `Gider ~${fmt.try(f.projectedExpense)} · Bakiye ~${fmt.signed(f.projectedBalance)}`,
+      ),
+    );
+  }
+
+  // Anomaly
+  if (ins.anomaly) {
+    const a = ins.anomaly;
+    card.appendChild(
+      insightRow(
+        "bell",
+        "warn",
+        `Dikkat: ${a.category} arttı`,
+        `${fmt.try(a.amount)} (ort. ${fmt.try(a.avg)})`,
+      ),
+    );
+  }
+
+  hydrateIcons(card);
 }
 
 /* ==========================================================================

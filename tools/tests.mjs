@@ -153,6 +153,7 @@ const APP_PLUS_EXPORTS =
   CATEGORY_META, CHART_PALETTE, OUNCE_TO_GRAM,
   CURRENCY_META, FX, Currency, currentCurrency, currencyMeta, convertFromTry,
   SearchPalette, dailyExpenseHeatmap, BackupCrypto,
+  computeInsights, shiftMonthKey, detectAnomaly, expenseByCategory,
 });`;
 vm.runInContext(APP_PLUS_EXPORTS, sandbox);
 
@@ -413,6 +414,51 @@ test("BackupCrypto: each encryption uses a fresh salt + iv", async () => {
   const b = await sandbox.BackupCrypto.encrypt("x", "p");
   assert.notEqual(a.salt, b.salt);
   assert.notEqual(a.iv, b.iv);
+});
+
+test("shiftMonthKey rolls across year boundary", () => {
+  assert.equal(sandbox.shiftMonthKey("2026-03", 1), "2026-02");
+  assert.equal(sandbox.shiftMonthKey("2026-01", 1), "2025-12");
+  assert.equal(sandbox.shiftMonthKey("2026-05", 3), "2026-02");
+});
+
+test("computeInsights: top category, share, vs-last-month delta", () => {
+  sandbox.Store.update((s) => {
+    s.transactions = [
+      // Önceki ay (2026-02): 1000 gider
+      { id: "p1", type: "expense", category: "Market", amount: 1000, date: "2026-02-10" },
+      // Bu ay (2026-03): 1500 Market + 500 Yakıt = 2000 gider, 3000 gelir
+      { id: "c1", type: "expense", category: "Market", amount: 1500, date: "2026-03-05" },
+      { id: "c2", type: "expense", category: "Yakıt", amount: 500, date: "2026-03-06" },
+      { id: "c3", type: "income", category: "Maaş", amount: 3000, date: "2026-03-01" },
+    ];
+  });
+  const ins = sandbox.computeInsights("2026-03");
+  assert.equal(ins.cur.expense, 2000);
+  assert.equal(ins.cur.balance, 1000);
+  assert.equal(ins.topCat, "Market");
+  assert.equal(ins.topAmt, 1500);
+  assert.equal(Math.round(ins.topShare), 75); // 1500/2000
+  assert.equal(ins.expenseDelta, 1000); // 2000 − 1000
+  assert.equal(Math.round(ins.expensePct), 100); // +100%
+});
+
+test("detectAnomaly flags a category that spiked vs recent average", () => {
+  sandbox.Store.update((s) => {
+    s.transactions = [
+      { id: "a1", type: "expense", category: "Fatura", amount: 300, date: "2026-01-10" },
+      { id: "a2", type: "expense", category: "Fatura", amount: 300, date: "2026-02-10" },
+      // Mart: 1500 → ort. 300'ün çok üstünde
+      { id: "a3", type: "expense", category: "Fatura", amount: 1500, date: "2026-03-10" },
+    ];
+  });
+  const byCat = sandbox.expenseByCategory(
+    sandbox.Store.state.transactions.filter((t) => t.date.startsWith("2026-03")),
+  );
+  const anomaly = sandbox.detectAnomaly("2026-03", byCat, 2);
+  assert.equal(anomaly.category, "Fatura");
+  assert.equal(anomaly.amount, 1500);
+  assert.equal(anomaly.avg, 300);
 });
 
 // Run

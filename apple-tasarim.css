@@ -1161,6 +1161,70 @@ html[data-theme="dark"] .tab.active {
   background: var(--neg-bg);
   color: var(--neg);
 }
+
+/* ============ INSIGHTS ============ */
+.insights-card {
+  background: var(--bg-2);
+  border-radius: var(--r-card-sm);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.insight-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+.insight-row + .insight-row {
+  border-top: 0.5px solid var(--hairline);
+}
+.insight-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--fg-2);
+  background: var(--hairline);
+}
+.insight-ic svg {
+  width: 18px;
+  height: 18px;
+}
+.insight-ic.pos {
+  color: var(--pos-strong);
+  background: var(--pos-bg);
+}
+.insight-ic.neg {
+  color: var(--neg);
+  background: var(--neg-bg);
+}
+.insight-ic.warn {
+  color: #9a6800;
+  background: rgba(255, 176, 32, 0.16);
+}
+.insight-ic.neutral {
+  color: var(--fg-2);
+  background: var(--hairline);
+}
+.insight-text {
+  min-width: 0;
+}
+.insight-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.insight-value {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-1);
+  margin-top: 1px;
+}
 .trend-chart {
   position: relative;
   height: 100px;
