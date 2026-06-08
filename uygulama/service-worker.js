@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "ggai-v43";
+const CACHE_NAME = "ggai-v44";
 const ASSETS = [
   "./",
   "./index.html",

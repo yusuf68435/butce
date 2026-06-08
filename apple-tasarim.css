@@ -58,9 +58,9 @@
   --r-pill: 999px;
   --r-input: 14px;
 
-  /* Shadows */
+  /* Shadows — Apple iOS 16+ flat: subtle elevation, no glossy inset highlight */
   --shadow-card:
-    0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 8px 24px rgba(10, 14, 26, 0.06);
+    0 1px 2px rgba(10, 14, 26, 0.04), 0 8px 24px rgba(10, 14, 26, 0.05);
   --shadow-md: 0 12px 40px rgba(10, 14, 26, 0.1);
   --shadow-lg: 0 24px 60px rgba(10, 14, 26, 0.14);
   --shadow-hero:
@@ -96,8 +96,7 @@ html[data-theme="dark"] {
   --hairline: rgba(245, 247, 251, 0.12);
   --hairline-strong: rgba(245, 247, 251, 0.2);
 
-  --shadow-card:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.4);
   --shadow-hero:
     0 30px 80px -20px rgba(0, 224, 143, 0.2),
@@ -117,8 +116,7 @@ html[data-theme="dark"] {
     --hairline: rgba(245, 247, 251, 0.12);
     --hairline-strong: rgba(245, 247, 251, 0.2);
 
-    --shadow-card:
-      0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.28);
     --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.4);
     --shadow-hero:
       0 30px 80px -20px rgba(0, 224, 143, 0.2),
@@ -143,7 +141,8 @@ html[data-theme="dark"] {
   outline: none;
 }
 :focus-visible {
-  outline: 2px solid var(--neon-1);
+  /* Apple: focus halkası daima tint (aksan) rengiyle eşleşir */
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -2408,7 +2407,8 @@ html[data-theme="dark"] .price-card .pull-btn {
 
 /* ============ EMPTY ============ */
 .empty {
-  padding: 36px 18px 30px;
+  /* 8pt grid: 32/16/24 (was 36/18/30 — off-grid) */
+  padding: 32px 16px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
