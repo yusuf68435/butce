@@ -15,11 +15,12 @@
   --bg-2: #ffffff;
   --bg-3: #eceef3;
 
-  /* Foreground (light) — fg-3 hits 4.5:1 on bg / bg-2 */
+  /* Foreground (light) — Apple semantic ladder: label / secondaryLabel / tertiaryLabel
+     fg-3 still hits 4.5:1 on bg / bg-2 (WCAG AA). */
   --fg-1: #0a0e1a;
-  --fg-2: rgba(10, 14, 26, 0.74);
+  --fg-2: rgba(10, 14, 26, 0.85);
   --fg-3: rgba(10, 14, 26, 0.62);
-  --fg-4: rgba(10, 14, 26, 0.36);
+  --fg-4: rgba(10, 14, 26, 0.32);
   --hairline: rgba(10, 14, 26, 0.08);
   --hairline-strong: rgba(10, 14, 26, 0.14);
 
@@ -88,11 +89,12 @@ html[data-theme="dark"] {
   --bg-3: #161a24;
 
   --fg-1: #f5f7fb;
-  --fg-2: rgba(245, 247, 251, 0.74);
-  --fg-3: rgba(245, 247, 251, 0.58);
+  --fg-2: rgba(245, 247, 251, 0.78);
+  --fg-3: rgba(245, 247, 251, 0.55);
   --fg-4: rgba(245, 247, 251, 0.28);
-  --hairline: rgba(245, 247, 251, 0.06);
-  --hairline-strong: rgba(245, 247, 251, 0.12);
+  /* Separator more visible in dark — Apple uses ~0.18 here, not 0.06 */
+  --hairline: rgba(245, 247, 251, 0.12);
+  --hairline-strong: rgba(245, 247, 251, 0.2);
 
   --shadow-card:
     0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
@@ -109,11 +111,11 @@ html[data-theme="dark"] {
     --bg-3: #161a24;
 
     --fg-1: #f5f7fb;
-    --fg-2: rgba(245, 247, 251, 0.74);
-    --fg-3: rgba(245, 247, 251, 0.58);
+    --fg-2: rgba(245, 247, 251, 0.78);
+    --fg-3: rgba(245, 247, 251, 0.55);
     --fg-4: rgba(245, 247, 251, 0.28);
-    --hairline: rgba(245, 247, 251, 0.06);
-    --hairline-strong: rgba(245, 247, 251, 0.12);
+    --hairline: rgba(245, 247, 251, 0.12);
+    --hairline-strong: rgba(245, 247, 251, 0.2);
 
     --shadow-card:
       0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
@@ -1278,7 +1280,7 @@ html[data-theme="dark"] .tab.active {
   font-weight: 600;
   color: var(--fg-1);
   white-space: nowrap;
-  transition: transform 0.14s var(--ease-spring);
+  transition: transform 0.16s var(--ease-spring);
   touch-action: manipulation;
 }
 .tpl-chip:active {
@@ -1574,7 +1576,7 @@ body.locked {
   font-size: 26px;
   font-weight: 600;
   color: var(--fg-1);
-  transition: transform 0.12s var(--ease-spring);
+  transition: transform 0.16s var(--ease-spring);
 }
 .lock-key:active {
   transform: scale(0.92);
@@ -1632,7 +1634,7 @@ body.locked {
   cursor: pointer;
   position: relative;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
-  transition: transform 0.12s var(--ease-spring);
+  transition: transform 0.16s var(--ease-spring);
 }
 .accent-swatch:active {
   transform: scale(0.88);
@@ -1772,7 +1774,7 @@ body.locked {
   gap: 1px;
   padding: 2px;
   color: var(--fg-1);
-  transition: transform 0.12s var(--ease-spring);
+  transition: transform 0.16s var(--ease-spring);
 }
 .cal-cell:active {
   transform: scale(0.9);
@@ -3484,7 +3486,7 @@ html[data-theme="dark"] .confirm-btn.primary {
   background: var(--bg-3, #2b2f3a);
   border: 0;
   padding: 0;
-  transition: transform 0.12s ease;
+  transition: transform 0.16s ease;
 }
 .hm-cell.hm-empty {
   background: transparent;
