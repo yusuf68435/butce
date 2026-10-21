@@ -1993,6 +1993,7 @@ const Sheets = (() => {
 
     function onDown(e) {
       if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest("button, a, input, select, textarea, [contenteditable]")) return;
       pointerId = e.pointerId;
       startY = e.clientY;
       lastY = e.clientY;
@@ -2036,10 +2037,10 @@ const Sheets = (() => {
 
     handles.forEach((h) => {
       h.addEventListener("pointerdown", onDown);
-      h.addEventListener("pointermove", onMove);
-      h.addEventListener("pointerup", onUp);
-      h.addEventListener("pointercancel", onUp);
     });
+    sheet.addEventListener("pointermove", onMove);
+    sheet.addEventListener("pointerup", onUp);
+    sheet.addEventListener("pointercancel", onUp);
   }
 
   function close(id, fromPop = false) {

@@ -1,8 +1,9 @@
-// Otomatik 25 ekran görüntüsü — screenshots/ klasörüne PNG olarak yazar.
+// Otomatik 26 ekran görüntüsü — screenshots/ klasörüne PNG olarak yazar.
 // Çalıştırma: node tools/capture.mjs
 // Önkoşul: npm i playwright
 
 import { chromium, devices } from "playwright";
+import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
@@ -129,9 +130,87 @@ async function gotoFresh(page, seed) {
 }
 
 async function shoot(page, name, opts = {}) {
+  const visibleClosedSheets = await page
+    .locator(".sheet:not(.open)")
+    .evaluateAll((sheets) =>
+      sheets
+        .filter((sheet) => getComputedStyle(sheet).visibility !== "hidden")
+        .map((sheet) => sheet.id),
+    );
+  assert.deepEqual(visibleClosedSheets, [], `${name}: closed sheets must be hidden`);
   const path = resolve(OUT, name);
   await page.screenshot({ path, omitBackground: false, ...opts });
   console.log("✓", name);
+}
+
+async function verifyReceiptViewer(page) {
+  const viewer = page.locator("#sheet-receipt");
+  assert.equal(await viewer.isVisible(), false, "Closed receipt viewer must be hidden");
+  await page.click("#header-add");
+  await page.locator("#sheet-tx.open").waitFor();
+  const receiptImage = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 360;
+    canvas.height = 720;
+    const drawing = canvas.getContext("2d");
+    drawing.fillStyle = "#ffffff";
+    drawing.fillRect(0, 0, canvas.width, canvas.height);
+    drawing.fillStyle = "#111827";
+    drawing.font = "24px sans-serif";
+    drawing.fillText("TEST RECEIPT", 36, 70);
+    drawing.fillText("Market: 1250 TRY", 36, 140);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.setInputFiles("#receipt-file", {
+    name: "test-receipt.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(receiptImage, "base64"),
+  });
+  await page.locator("#receipt-thumb").waitFor({ state: "visible" });
+  await page.click("#receipt-thumb");
+  await page.locator("#sheet-receipt.open").waitFor();
+  await page.waitForFunction(() => {
+    const image = document.getElementById("receipt-viewer-img");
+    return image.complete && image.naturalWidth > 0;
+  });
+  await sleep(600);
+  const fitsViewport = await viewer.evaluate((sheet) => {
+    const bounds = sheet.getBoundingClientRect();
+    const image = sheet.querySelector("img").getBoundingClientRect();
+    return bounds.top >= 0 && bounds.bottom <= innerHeight + 1 &&
+      image.top >= bounds.top && image.bottom <= bounds.bottom + 1;
+  });
+  assert.equal(fitsViewport, true, "Receipt image must fit inside its sheet and viewport");
+  await shoot(page, "26-sheet-receipt.png");
+  await page.click("#sheet-receipt [data-sheet-close]");
+  await viewer.waitFor({ state: "hidden" });
+  assert.equal(await page.locator("#sheet-tx").isVisible(), true);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.click("#receipt-thumb");
+  await page.locator("#sheet-receipt.open").waitFor();
+  const transitionDelays = await viewer.evaluate((sheet) => getComputedStyle(sheet).transitionDelay);
+  assert.ok(transitionDelays.split(",").every((delay) => parseFloat(delay) === 0));
+  await page.keyboard.press("Escape");
+  await viewer.waitFor({ state: "hidden" });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.click("#receipt-thumb");
+  await page.locator("#sheet-receipt.open").waitFor();
+  await sleep(600);
+  const grabber = await page.locator("#sheet-receipt .sheet-grabber").boundingBox();
+  assert.ok(grabber);
+  const pointerX = grabber.x + grabber.width / 2;
+  const pointerY = grabber.y + grabber.height / 2;
+  await page.mouse.move(pointerX, pointerY);
+  await page.mouse.down();
+  await page.mouse.move(pointerX, pointerY + 140, { steps: 6 });
+  await page.mouse.up();
+  await viewer.waitFor({ state: "hidden" });
+  assert.equal(await viewer.evaluate((sheet) => sheet.classList.contains("dragging")), false);
+  await page.click("#sheet-tx [data-sheet-close]");
+  await page.locator("#sheet-tx").waitFor({ state: "hidden" });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  console.log("✓ Receipt viewer: hidden when closed, image fits, button/Escape/drag close and reduced motion");
 }
 
 async function clickTab(page, target) {
@@ -170,6 +249,8 @@ async function run() {
     // ───────── LIGHT MODE ─────────
     {
       const { ctx, page } = await newPage(browser, "light");
+      await gotoFresh(page, SEED);
+      await verifyReceiptViewer(page);
       await gotoFresh(page, SEED);
 
       // 01 Cash hero+wealth
@@ -368,7 +449,7 @@ async function run() {
       await ctx.close();
     }
 
-    console.log("\n→ 25 ekran görüntüsü", OUT, "klasörüne yazıldı.");
+    console.log("\n→ 26 ekran görüntüsü", OUT, "klasörüne yazıldı.");
   } finally {
     await browser.close();
     server.kill();

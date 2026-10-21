@@ -96,7 +96,7 @@ için kullanılmaz. Varsayılan dalın değiştirilmesi ayrı bir depo yönetimi
 │   └── service-worker.js   # Cache-first + update prompt (ggai-v38)
 └── tools/                  # build düz dist/ üretir (Vercel buradan deploy eder)
     ├── build.mjs       # terser + csso → dist/
-    ├── capture.mjs     # Playwright 25-screenshot pipeline
+    ├── capture.mjs     # Playwright 26-screenshot pipeline
     └── tests.mjs       # Node.js vm sandbox ile birim testleri
 ```
 
@@ -124,6 +124,10 @@ gelmez. Güncel test sayısı ve sonuçları `npm test` çıktısından okunur.
 `package-lock.json` depoda tutulur. Bağımlılıkları bilinçli olarak güncellerken
 `npm install` kullan ve kilit dosyası değişikliğini incele; normal kurulumda ve
 CI üzerinde `npm ci` kullanılır.
+
+Ekran görüntüsü akışı, kapalı panellerin görünmezliğini ve sentetik bir fiş
+fotoğrafının panel içinde açılıp kapanmasını da kontrol eder. Normal ve azaltılmış
+hareket davranışı doğrulanır; 26 PNG içinde açık fiş paneli de bulunur.
 
 ## Komutlar (Settings sheet)
 
