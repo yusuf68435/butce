@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main, master]
 
-# Note: package-lock.json is gitignored in this repo, so we use `npm install`
-# (not `npm ci`) and skip the lockfile-based npm cache.
-
 jobs:
   unit-tests:
     name: Unit tests
@@ -18,7 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
+          cache: npm
+      - run: npm ci --no-audit --no-fund
       - run: npm test
 
   build-and-audit:
@@ -31,9 +29,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Build
         run: npm run build
@@ -54,7 +53,7 @@ jobs:
           temporaryPublicStorage: true
 
   capture-screenshots:
-    name: Capture 20 screenshots
+    name: Capture screenshots
     runs-on: ubuntu-latest
     needs: build-and-audit
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
@@ -64,8 +63,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
 
       - name: Capture

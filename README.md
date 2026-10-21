@@ -23,7 +23,7 @@ Kişisel finans takibi yapan, **sunucusuz, çevrimdışı çalışan** PWA. Tüm
 - **Fiş fotoğrafı** (IndexedDB, JPEG sıkıştırma, lazy thumbnail)
 - **Multi-currency** (TRY / USD / EUR — Frankfurter.app FX cache, offline-first, veri ₺ saklanır)
 - Dark/Light/Auto tema · **TR/EN dil** · **bakiyeyi gizle** · Pull-to-refresh · Haptic feedback
-- Çevrimdışı tam fonksiyonel (Service Worker), WCAG AA (Lighthouse 100), SEO 100
+- Service Worker ile çevrimdışı kullanım; erişilebilirlik ve performans kontrolleri için CI üzerinde Lighthouse
 
 ## Çalıştırma (yerel)
 
@@ -48,7 +48,7 @@ Sonra: <http://localhost:8080/uygulama/> (uygulama `uygulama/` altında; `apple-
 1. <https://vercel.com> üzerinden GitHub ile giriş yap
 2. Bu repoyu push'la (aşağıda)
 3. "Import Project" → bu repo → "Deploy"
-4. Otomatik HTTPS + Brotli + global CDN. Performance skoru 90+ otomatik.
+4. Dağıtım tamamlandıktan sonra HTTPS adresini ve uygulamanın çalışmasını kontrol et.
 
 ### Seçenek B — Netlify Drop (en hızlı, repo gerekmez)
 
@@ -65,22 +65,20 @@ Sonra: <http://localhost:8080/uygulama/> (uygulama `uygulama/` altında; `apple-
 
 ### Seçenek D — GitHub Pages
 
-```bash
-git remote add origin git@github.com:KULLANICI/butce.git
-git push -u origin master
-```
-
-GitHub repo → Settings → Pages → Source: master / root.
-
-## GitHub'a push
+Güncel uygulama `main` dalındadır. Depoyu klonlarken bu dalı açıkça seç:
 
 ```bash
-# 1. GitHub'da boş bir repo oluştur (örn. "butce")
-# 2. Aşağıdakileri çalıştır:
-git remote add origin git@github.com:KULLANICI_ADI/butce.git
-git branch -M main
-git push -u origin main
+git clone --branch main https://github.com/yusuf68435/butce.git
+cd butce
+npm ci
+npm test
+npm run build
 ```
+
+GitHub repo → Settings → Pages → Source: **GitHub Actions**.
+`.github/workflows/pages.yml`, `main` dalına gönderilen değişikliklerde veya elle
+başlatıldığında `dist/` çıktısını yayımlar. `master / root` yöntemi bu build akışı
+için kullanılmaz. Varsayılan dalın değiştirilmesi ayrı bir depo yönetimi kararıdır.
 
 ## Yapı
 
@@ -99,18 +97,33 @@ git push -u origin main
 └── tools/                  # build düz dist/ üretir (Vercel buradan deploy eder)
     ├── build.mjs       # terser + csso → dist/
     ├── capture.mjs     # Playwright 25-screenshot pipeline
-    └── tests.mjs       # 40 unit tests, vm sandbox
+    └── tests.mjs       # Node.js vm sandbox ile birim testleri
 ```
 
 ## Geliştirme
 
 ```bash
-# Kurulum (sadece capture script için)
-npm install
+# Geliştirme bağımlılıklarını kilit dosyasındaki sürümlerle kur
+npm ci
 
-# 25 screenshot al
+# Birim testlerini çalıştır (tarayıcı veya bağımlılık kurulumu gerektirmez)
+npm test
+
+# Üretim çıktısını oluştur
+npm run build
+
+# Ekran görüntüleri için Chromium kur ve capture akışını çalıştır
+npx playwright install chromium
 npm run capture
 ```
+
+Test kapsamı `tools/tests.mjs` içindeki yardımcı işlevler, i18n ve şifreleme
+kontrolleridir; gerçek cihaz ve tüm kullanıcı akışlarının doğrulandığı anlamına
+gelmez. Güncel test sayısı ve sonuçları `npm test` çıktısından okunur.
+
+`package-lock.json` depoda tutulur. Bağımlılıkları bilinçli olarak güncellerken
+`npm install` kullan ve kilit dosyası değişikliğini incele; normal kurulumda ve
+CI üzerinde `npm ci` kullanılır.
 
 ## Komutlar (Settings sheet)
 

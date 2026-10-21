@@ -23,14 +23,19 @@ Teşekkürler! Bu küçük PWA tek kişiye yardımcı olmak için yazılıyor, b
 ## Geliştirme akışı
 
 ```bash
-git clone https://github.com/yusuf68435/butce
+git clone --branch main https://github.com/yusuf68435/butce.git
 cd butce
-npm install
-npm test           # 15 unit tests
-npm run serve      # http://localhost:8080
-npm run capture    # 20 screenshot (Playwright)
+npm ci
+npm test
+npm run serve      # http://localhost:8080/uygulama/
+npx playwright install chromium
+npm run capture
 npm run build      # dist/ minified bundle
 ```
+
+`npm test` yalnızca Node.js yerleşik modüllerini kullanır; bağımlılık kurulmadan da
+çalıştırılabilir. Test sayısı için komut çıktısını esas al. Bağımlılık güncellemeleri
+`package-lock.json` ile birlikte gönderilir; normal kurulumda `npm ci` kullanılır.
 
 ## Commit formatı
 
