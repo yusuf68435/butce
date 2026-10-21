@@ -147,4 +147,7 @@ hareket davranışı doğrulanır; 26 PNG içinde açık fiş paneli de bulunur.
 
 ## Lisans
 
-MIT — kişisel kullanım için yapıldı, dağıtmakta özgürsün.
+Proje sahibine ait kod, belgeler ve görseller [MIT lisansı](LICENSE) altındadır.
+Üçüncü taraf paket/fontlar ve harici hizmetler kendi lisans/koşullarında kalır;
+[kapsam ve üçüncü taraf notlarına](THIRD_PARTY_NOTICES.md) bak. Bu beyan ayrı
+Bütçe Mobile deposuna lisans vermez.

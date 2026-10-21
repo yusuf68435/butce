@@ -2,6 +2,13 @@
 
 Teşekkürler! Bu küçük PWA tek kişiye yardımcı olmak için yazılıyor, basit kalsın istiyoruz. PR'larında lütfen şunlara dikkat et:
 
+## Lisans ve katkı kapsamı
+
+Proje sahibine ait kod ve görseller [MIT](LICENSE) ile lisanslıdır.
+[Üçüncü taraf notları](THIRD_PARTY_NOTICES.md) ayrı kapsamları açıklar. Katkının
+paylaşımına yetkili olduğundan emin ol; üçüncü taraf kaynakların lisans ve
+atıflarını koru, eklediğin bağımlılık veya varlığın kaynağını belirt.
+
 ## Kod tarzı
 
 - **Vanilla HTML/CSS/JS** — framework yok, build-step minify dışında yok.
